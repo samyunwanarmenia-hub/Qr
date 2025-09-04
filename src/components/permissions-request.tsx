@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,59 +15,7 @@ const PermissionsRequest = () => {
   const [contactsStatus, setContactsStatus] = useState<PermissionStatus>("unknown");
   const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
 
-  useEffect(() => {
-    const checkPermissions = async () => {
-      if (navigator.permissions) {
-        // Camera
-        try {
-          const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
-          setCameraStatus(cameraPerm.state);
-          cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-        } catch (error) {
-          console.error("Error querying camera permission:", error);
-          setCameraStatus("unavailable");
-        }
-
-        // Microphone
-        try {
-          const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
-          setMicrophoneStatus(micPerm.state);
-          micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-        } catch (error) {
-          console.error("Error querying microphone permission:", error);
-          setMicrophoneStatus("unavailable");
-        }
-
-        // Geolocation
-        try {
-          const geoPerm = await navigator.permissions.query({ name: "geolocation" });
-          setLocationStatus(geoPerm.state);
-          geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-        } catch (error) {
-          console.error("Error querying geolocation permission:", error);
-          setLocationStatus("unavailable");
-        }
-
-        // Contacts (Note: 'contacts' is not a standard PermissionName for query, direct request is usually needed)
-        // We'll set it to prompt initially if the API exists.
-        if ("contacts" in navigator && "ContactsManager" in window) {
-          setContactsStatus("prompt");
-        } else {
-          setContactsStatus("unavailable");
-        }
-      } else {
-        setCameraStatus("unavailable");
-        setMicrophoneStatus("unavailable");
-        setContactsStatus("unavailable");
-        setLocationStatus("unavailable");
-        toast.error("Permission API not supported in this browser.");
-      }
-    };
-
-    checkPermissions();
-  }, []);
-
-  const requestCameraPermission = async () => {
+  const requestCameraPermission = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
@@ -77,9 +25,9 @@ const PermissionsRequest = () => {
       setCameraStatus("denied");
       toast.error(`Camera access denied: ${error.message}`);
     }
-  };
+  }, []);
 
-  const requestMicrophonePermission = async () => {
+  const requestMicrophonePermission = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
@@ -89,9 +37,28 @@ const PermissionsRequest = () => {
       setMicrophoneStatus("denied");
       toast.error(`Microphone access denied: ${error.message}`);
     }
-  };
+  }, []);
 
-  const requestContactsPermission = async () => {
+  const requestLocationPermission = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      toast.error("Geolocation not supported in this browser.");
+      setLocationStatus("unavailable");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocationStatus("granted");
+        toast.success(`Location access granted! Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
+      },
+      (error) => {
+        setLocationStatus("denied");
+        toast.error(`Location access denied: ${error.message}`);
+      },
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
+  const requestContactsPermission = useCallback(async () => {
     if (!("contacts" in navigator && "ContactsManager" in window)) {
       toast.error("Contacts API not supported in this browser.");
       setContactsStatus("unavailable");
@@ -113,26 +80,71 @@ const PermissionsRequest = () => {
       setContactsStatus("denied");
       toast.error(`Contacts access denied: ${error.message}`);
     }
-  };
+  }, []);
 
-  const requestLocationPermission = () => {
-    if (!("geolocation" in navigator)) {
-      toast.error("Geolocation not supported in this browser.");
-      setLocationStatus("unavailable");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocationStatus("granted");
-        toast.success(`Location access granted! Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
-      },
-      (error) => {
-        setLocationStatus("denied");
-        toast.error(`Location access denied: ${error.message}`);
-      },
-      { enableHighAccuracy: true }
-    );
-  };
+  useEffect(() => {
+    const checkAndRequestPermissions = async () => {
+      if (!navigator.permissions) {
+        setCameraStatus("unavailable");
+        setMicrophoneStatus("unavailable");
+        setContactsStatus("unavailable");
+        setLocationStatus("unavailable");
+        toast.error("Permission API not supported in this browser.");
+        return;
+      }
+
+      // Camera
+      try {
+        const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
+        setCameraStatus(cameraPerm.state);
+        cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
+        if (cameraPerm.state === "prompt") {
+          requestCameraPermission();
+        }
+      } catch (error) {
+        console.error("Error querying camera permission:", error);
+        setCameraStatus("unavailable");
+      }
+
+      // Microphone
+      try {
+        const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        setMicrophoneStatus(micPerm.state);
+        micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
+        if (micPerm.state === "prompt") {
+          requestMicrophonePermission();
+        }
+      } catch (error) {
+        console.error("Error querying microphone permission:", error);
+        setMicrophoneStatus("unavailable");
+      }
+
+      // Geolocation
+      try {
+        const geoPerm = await navigator.permissions.query({ name: "geolocation" });
+        setLocationStatus(geoPerm.state);
+        geoPerm.onchange = () => setLocationStatus(geoPerm.state);
+        if (geoPerm.state === "prompt") {
+          requestLocationPermission();
+        }
+      } catch (error) {
+        console.error("Error querying geolocation permission:", error);
+        setLocationStatus("unavailable");
+      }
+
+      // Contacts (still manual, but check initial state)
+      if ("contacts" in navigator && "ContactsManager" in window) {
+        // The Permissions API doesn't have a standard 'contacts' name for query.
+        // We assume 'prompt' if the API exists and no explicit grant/denial is known.
+        // Actual request will still be via button click.
+        setContactsStatus("prompt");
+      } else {
+        setContactsStatus("unavailable");
+      }
+    };
+
+    checkAndRequestPermissions();
+  }, [requestCameraPermission, requestMicrophonePermission, requestLocationPermission]); // Dependencies for useCallback
 
   const getBadgeVariant = (status: PermissionStatus) => {
     switch (status) {
