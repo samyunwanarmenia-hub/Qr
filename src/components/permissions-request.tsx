@@ -1,0 +1,234 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Camera, Mic, MapPin, Contact } from "lucide-react";
+
+type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown";
+
+const PermissionsRequest = () => {
+  const [cameraStatus, setCameraStatus] = useState<PermissionStatus>("unknown");
+  const [microphoneStatus, setMicrophoneStatus] = useState<PermissionStatus>("unknown");
+  const [contactsStatus, setContactsStatus] = useState<PermissionStatus>("unknown");
+  const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
+
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (navigator.permissions) {
+        // Camera
+        try {
+          const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
+          setCameraStatus(cameraPerm.state);
+          cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
+        } catch (error) {
+          console.error("Error querying camera permission:", error);
+          setCameraStatus("unavailable");
+        }
+
+        // Microphone
+        try {
+          const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
+          setMicrophoneStatus(micPerm.state);
+          micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
+        } catch (error) {
+          console.error("Error querying microphone permission:", error);
+          setMicrophoneStatus("unavailable");
+        }
+
+        // Geolocation
+        try {
+          const geoPerm = await navigator.permissions.query({ name: "geolocation" });
+          setLocationStatus(geoPerm.state);
+          geoPerm.onchange = () => setLocationStatus(geoPerm.state);
+        } catch (error) {
+          console.error("Error querying geolocation permission:", error);
+          setLocationStatus("unavailable");
+        }
+
+        // Contacts (Note: 'contacts' is not a standard PermissionName for query, direct request is usually needed)
+        // We'll set it to prompt initially if the API exists.
+        if ("contacts" in navigator && "ContactsManager" in window) {
+          setContactsStatus("prompt");
+        } else {
+          setContactsStatus("unavailable");
+        }
+      } else {
+        setCameraStatus("unavailable");
+        setMicrophoneStatus("unavailable");
+        setContactsStatus("unavailable");
+        setLocationStatus("unavailable");
+        toast.error("Permission API not supported in this browser.");
+      }
+    };
+
+    checkPermissions();
+  }, []);
+
+  const requestCameraPermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
+      setCameraStatus("granted");
+      toast.success("Camera access granted!");
+    } catch (error: any) {
+      setCameraStatus("denied");
+      toast.error(`Camera access denied: ${error.message}`);
+    }
+  };
+
+  const requestMicrophonePermission = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
+      setMicrophoneStatus("granted");
+      toast.success("Microphone access granted!");
+    } catch (error: any) {
+      setMicrophoneStatus("denied");
+      toast.error(`Microphone access denied: ${error.message}`);
+    }
+  };
+
+  const requestContactsPermission = async () => {
+    if (!("contacts" in navigator && "ContactsManager" in window)) {
+      toast.error("Contacts API not supported in this browser.");
+      setContactsStatus("unavailable");
+      return;
+    }
+    try {
+      const properties = ["name", "email", "tel", "address"];
+      const options = { multiple: true };
+      // The select method opens a contact picker, it doesn't just grant background access.
+      const contacts = await (navigator as any).contacts.select(properties, options);
+      if (contacts.length > 0) {
+        setContactsStatus("granted");
+        toast.success(`Accessed ${contacts.length} contacts!`);
+      } else {
+        setContactsStatus("denied"); // User closed picker without selecting
+        toast.info("No contacts selected or access denied.");
+      }
+    } catch (error: any) {
+      setContactsStatus("denied");
+      toast.error(`Contacts access denied: ${error.message}`);
+    }
+  };
+
+  const requestLocationPermission = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("Geolocation not supported in this browser.");
+      setLocationStatus("unavailable");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocationStatus("granted");
+        toast.success(`Location access granted! Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`);
+      },
+      (error) => {
+        setLocationStatus("denied");
+        toast.error(`Location access denied: ${error.message}`);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const getBadgeVariant = (status: PermissionStatus) => {
+    switch (status) {
+      case "granted":
+        return "default";
+      case "denied":
+        return "destructive";
+      case "prompt":
+        return "secondary";
+      case "unavailable":
+        return "outline";
+      case "unknown":
+      default:
+        return "outline";
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4 sm:p-8 max-w-3xl">
+      <h1 className="text-3xl font-bold mb-8 text-center">Permission Requests</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Camera Access</CardTitle>
+            <Camera className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(cameraStatus)}>{cameraStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to use your device's camera.
+            </p>
+            <Button onClick={requestCameraPermission} disabled={cameraStatus === "granted" || cameraStatus === "unavailable"}>
+              Request Camera
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Microphone Access</CardTitle>
+            <Mic className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(microphoneStatus)}>{microphoneStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to use your device's microphone.
+            </p>
+            <Button onClick={requestMicrophonePermission} disabled={microphoneStatus === "granted" || microphoneStatus === "unavailable"}>
+              Request Microphone
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Contacts Access</CardTitle>
+            <Contact className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(contactsStatus)}>{contactsStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to access your device's contacts. Note: This opens a picker.
+            </p>
+            <Button onClick={requestContactsPermission} disabled={contactsStatus === "unavailable"}>
+              Request Contacts
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Precise Location</CardTitle>
+            <MapPin className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(locationStatus)}>{locationStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to access your precise geographical location.
+            </p>
+            <Button onClick={requestLocationPermission} disabled={locationStatus === "granted" || locationStatus === "unavailable"}>
+              Request Location
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default PermissionsRequest;
