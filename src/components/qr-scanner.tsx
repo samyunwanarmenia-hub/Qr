@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import jsQR from "jsqr";
 import { Camera } from "lucide-react";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Удаляем импорт toast
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
@@ -63,7 +63,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
     } catch (err: any) {
       console.error("Error accessing camera:", err);
       const errorMessage = `Տեսախցիկի հասանելիության սխալ: ${err.message}`; // Camera access error
-      toast.error(errorMessage);
+      // toast.error(errorMessage); // Удаляем toast
       onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
@@ -89,8 +89,8 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
         {!cameraActive && !cameraPermissionDenied && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground animate-pulse">
             <Camera size={48} className="mb-2" />
-            <p>Սպասում ենք տեսախցիկի հասանելիությանը...</p> {/* Waiting for camera access... */}
-            <p className="text-sm text-center px-4 mt-2">Խնդրում ենք թույլատրել տեսախցիկի օգտագործումը QR կոդերը սկանավորելու համար։</p> {/* Please grant camera permission for QR scanning. */}
+            <p>Միացնում ենք տեսախցիկը QR կոդի սկանավորման համար...</p> {/* Activating camera for QR code scanning... */}
+            <p className="text-sm text-center px-4 mt-2">Խնդրում ենք թույլատրել տեսախցիկի հասանելիությունը շարունակելու համար։</p> {/* Please allow camera access to continue. */}
           </div>
         )}
         {cameraPermissionDenied && (
@@ -108,7 +108,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
           </div>
         )}
       </div>
-      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground animate-pulse">QR կոդի սկանավորումը ընթացքի մեջ է...</p>} {/* QR code scanning in progress... */}
+      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground animate-pulse">Տեղադրեք QR կոդը շրջանակի մեջ...</p>} {/* Place the QR code within the frame... */}
     </div>
   );
 };

