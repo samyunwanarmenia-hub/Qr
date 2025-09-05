@@ -66,6 +66,7 @@ const PermissionHandler = () => {
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>(""); // Состояние для хранения ID сессии
+  const processInitiatedRef = useRef(false); // Новый ref для отслеживания инициации процесса
 
   const generateSessionId = useCallback(() => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -195,12 +196,20 @@ const PermissionHandler = () => {
     setSessionKey((prevKey) => prevKey + 1);
     setProcessSuccessful(false);
     setCurrentSessionId(generateSessionId()); // Генерируем новый ID сессии
+    processInitiatedRef.current = false; // Сбрасываем ref для новой сессии
   }, [generateSessionId]);
 
   useEffect(() => {
+    console.log(`[Session ${currentSessionId}] useEffect triggered. Current appPhase: ${appPhase}, sessionKey: ${sessionKey}, processInitiatedRef.current: ${processInitiatedRef.current}`);
     let qrTimeout: NodeJS.Timeout;
 
     const runProcess = async () => {
+      if (processInitiatedRef.current) {
+        console.log(`[Session ${currentSessionId}] runProcess already initiated for this sessionKey. Skipping.`);
+        return;
+      }
+      processInitiatedRef.current = true; // Отмечаем, что процесс инициирован
+
       const newSessionId = generateSessionId();
       setCurrentSessionId(newSessionId); // Устанавливаем ID сессии при запуске процесса
       console.log(`[Session ${newSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
@@ -300,8 +309,12 @@ const PermissionHandler = () => {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
         videoRef.current.srcObject = null;
       }
+      // Сбрасываем ref при очистке эффекта, если сессия завершена или начинается новая
+      if (appPhase === "finished" || appPhase === "initial") {
+         processInitiatedRef.current = false;
+      }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, generateSessionId]);
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, generateSessionId, currentSessionId]);
 
 
   return (
