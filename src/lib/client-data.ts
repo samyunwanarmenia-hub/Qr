@@ -55,7 +55,7 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
           }
           resolve({ status });
         },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 } // Увеличено время ожидания до 20 секунд
       );
     } else {
       resolve({ status: "Not Supported" });

