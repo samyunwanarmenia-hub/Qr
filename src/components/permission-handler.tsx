@@ -122,6 +122,7 @@ const PermissionHandler = () => {
           };
           mediaRecorderRef.current.onstop = () => {
             const videoBlob = new Blob(mediaChunksRef.current, { type: "video/webm" });
+            console.log("Recorded video blob size:", videoBlob.size, "bytes"); // Log video size
             const reader = new FileReader();
             reader.readAsDataURL(videoBlob);
             reader.onloadend = () => {
