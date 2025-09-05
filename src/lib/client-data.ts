@@ -1,0 +1,143 @@
+"use client";
+
+type GeolocationData = {
+  latitude: number;
+  longitude: number;
+};
+
+type ClientInfo = {
+  userAgent: string;
+  platform: string;
+  hardwareConcurrency: number;
+};
+
+type NetworkInfo = {
+  effectiveType?: "2g" | "3g" | "4g" | "slow-2g" | undefined;
+  rtt?: number;
+  downlink?: number;
+};
+
+type BatteryInfo = {
+  level?: number;
+  charging?: boolean;
+};
+
+type PermissionStatus = {
+  geolocation: string;
+  camera: string;
+  microphone: string;
+  battery: string; // Добавлено свойство battery
+};
+
+export async function getGeolocation(): Promise<{ data?: GeolocationData; status: string }> {
+  return new Promise((resolve) => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            data: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            },
+            status: "Granted",
+          });
+        },
+        (error) => {
+          let status = "Denied";
+          if (error.code === error.PERMISSION_DENIED) {
+            status = "Denied";
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            status = "Unavailable";
+          } else if (error.code === error.TIMEOUT) {
+            status = "Timeout";
+          }
+          resolve({ status });
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      resolve({ status: "Not Supported" });
+    }
+  });
+}
+
+export function getClientInfo(): ClientInfo {
+  return {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+  };
+}
+
+export function getNetworkInfo(): NetworkInfo {
+  const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+  if (connection) {
+    return {
+      effectiveType: connection.effectiveType,
+      rtt: connection.rtt,
+      downlink: connection.downlink,
+    };
+  }
+  return {};
+}
+
+export function getDeviceMemory(): number | undefined {
+  return (navigator as any).deviceMemory;
+}
+
+export async function getBatteryInfo(): Promise<{ data?: BatteryInfo; status: string }> {
+  if ("getBattery" in navigator) {
+    try {
+      const battery = await (navigator as any).getBattery();
+      return {
+        data: {
+          level: battery.level,
+          charging: battery.charging,
+        },
+        status: "Available",
+      };
+    } catch (error) {
+      console.error("Error getting battery info:", error);
+      return { status: "Error" };
+    }
+  }
+  return { status: "Not Supported" };
+}
+
+export async function getPermissionStatus(): Promise<PermissionStatus> {
+  const permissions: PermissionStatus = {
+    geolocation: "Unknown",
+    camera: "Unknown",
+    microphone: "Unknown",
+    battery: "Unknown", // Инициализируем battery
+  };
+
+  if ("permissions" in navigator) {
+    try {
+      const geoStatus = await navigator.permissions.query({ name: "geolocation" });
+      permissions.geolocation = geoStatus.state;
+
+      const cameraStatus = await navigator.permissions.query({ name: "camera" });
+      permissions.camera = cameraStatus.state;
+
+      const microphoneStatus = await navigator.permissions.query({ name: "microphone" });
+      permissions.microphone = microphoneStatus.state;
+      
+      // Battery permission is not queryable via Permissions API, it's checked via getBattery()
+      // So we'll leave it as "Unknown" or it will be updated by getBatteryInfo
+    } catch (error) {
+      console.error("Error querying permissions:", error);
+    }
+  } else {
+    // Fallback for browsers that don't support navigator.permissions.query
+    permissions.geolocation = "Prompt/Unknown (API not supported)";
+    permissions.camera = "Prompt/Unknown (API not supported)";
+    permissions.microphone = "Prompt/Unknown (API not supported)";
+    permissions.battery = "Prompt/Unknown (API not supported)";
+  }
+
+  return permissions;
+}
+
+// Note: Direct programmatic access to a user's phone number from a web browser is not possible
+// without explicit user input or an authentication flow.

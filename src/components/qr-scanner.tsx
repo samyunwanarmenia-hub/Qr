@@ -2,15 +2,15 @@
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import jsQR from "jsqr";
-// import { toast } from "sonner"; // Удаляем импорт toast
-import { Camera } from "lucide-react"; // Using Lucide icon for visual feedback
+import { Camera } from "lucide-react";
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
   onScanError: (error: string) => void;
+  onCameraActive?: () => void; // New callback for when camera is successfully active
 }
 
-const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) => {
+const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -28,15 +28,16 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
         await videoRef.current.play();
         setCameraActive(true);
         setIsScanning(true);
+        onCameraActive?.(); // Notify parent that camera is active
         tick(); // Start scanning frames
       }
     } catch (err: any) {
       console.error("Error accessing back camera:", err);
-      onScanError(`Failed to access back camera: ${err.message}`); // onScanError callback remains for internal logic
+      onScanError(`Failed to access back camera: ${err.message}`);
       setCameraActive(false);
       setIsScanning(false);
     }
-  }, [onScanError]);
+  }, [onScanError, onCameraActive]);
 
   const tick = useCallback(() => {
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
@@ -56,7 +57,6 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
         if (code) {
           console.log("QR Code detected:", code.data);
           onQrCodeScanned(code.data);
-          // toast.success("QR Code scanned!"); // Удаляем тост
           setIsScanning(false); // Stop scanning after finding one
           if (video.srcObject) {
             (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
@@ -84,13 +84,13 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <h2 className="text-2xl font-bold mb-4">Scan QR Code</h2>
+      <h2 className="text-2xl font-bold mb-4">Сканирование QR-кода</h2>
       <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
         {!cameraActive && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
             <Camera size={48} className="mb-2" />
-            <p>Accessing camera...</p>
-            <p className="text-sm text-center px-4">Please grant camera permissions to scan QR codes.</p>
+            <p>Доступ к камере...</p>
+            <p className="text-sm text-center px-4">Пожалуйста, предоставьте разрешение на использование камеры для сканирования QR-кодов.</p>
           </div>
         )}
         <video ref={videoRef} className="w-full h-full object-cover" style={{ display: cameraActive ? 'block' : 'none' }} />
@@ -101,7 +101,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
           </div>
         )}
       </div>
-      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground">Scanning for QR code...</p>}
+      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground">Идет сканирование QR-кода...</p>}
     </div>
   );
 };
