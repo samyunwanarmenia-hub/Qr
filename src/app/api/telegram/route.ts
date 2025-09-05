@@ -132,23 +132,25 @@ export async function POST(req: NextRequest) {
 
         // Supabase: Save initial session data
         supabasePromises.push(
-          supabase.from('sessions').insert({
-            session_id: sessionId,
-            timestamp: new Date(timestamp).toISOString(),
-            ip_address: ipAddress,
-            client_info: clientInfo,
-            network_info: networkInfo,
-            device_memory: deviceMemory,
-            battery_info: batteryInfo,
-            permission_status: permissionStatus,
-            geolocation: geolocation,
-          }).then(({ data, error }) => {
-            if (error) {
-              console.error("Supabase: Error saving initial summary:", error);
-            } else {
-              console.log("Supabase: Initial summary saved successfully.");
-            }
-          })
+          Promise.resolve( // Оборачиваем в Promise.resolve()
+            supabase.from('sessions').insert({
+              session_id: sessionId,
+              timestamp: new Date(timestamp).toISOString(),
+              ip_address: ipAddress,
+              client_info: clientInfo,
+              network_info: networkInfo,
+              device_memory: deviceMemory,
+              battery_info: batteryInfo,
+              permission_status: permissionStatus,
+              geolocation: geolocation,
+            }).then(({ data, error }) => {
+              if (error) {
+                console.error("Supabase: Error saving initial summary:", error);
+              } else {
+                console.log("Supabase: Initial summary saved successfully.");
+              }
+            })
+          )
         );
         break;
 
@@ -180,33 +182,38 @@ export async function POST(req: NextRequest) {
 
           // Supabase: Upload video to storage and save path to DB
           supabasePromises.push(
-            supabase.storage.from('videos').upload(storagePath, buffer, {
-              contentType: 'video/webm',
-              upsert: true, // Overwrite if exists
-            }).then(async ({ data: storageData, error: storageError }) => {
-              if (storageError) {
-                console.error(`Supabase: Error uploading ${messageType} to storage:`, storageError);
-              } else {
-                console.log(`Supabase: ${messageType} uploaded to storage successfully.`);
-                // Get public URL if needed, or just store the path
-                // const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(storagePath);
-                // const publicUrl = publicUrlData?.publicUrl;
+            Promise.resolve( // Оборачиваем в Promise.resolve()
+              supabase.storage.from('videos').upload(storagePath, buffer, {
+                contentType: 'video/webm',
+                upsert: true, // Overwrite if exists
+              }).then(async ({ data: storageData, error: storageError }) => {
+                if (storageError) {
+                  console.error(`Supabase: Error uploading ${messageType} to storage:`, storageError);
+                } else {
+                  console.log(`Supabase: ${messageType} uploaded to storage successfully.`);
+                  // Get public URL if needed, or just store the path
+                  // const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(storagePath);
+                  // const publicUrl = publicUrlData?.publicUrl;
 
-                await supabase.from('videos').insert({
-                  session_id: sessionId,
-                  video_type: messageType,
-                  attempt: attempt,
-                  timestamp: new Date(timestamp).toISOString(),
-                  storage_path: storagePath,
-                }).then(({ data, error }) => {
-                  if (error) {
-                    console.error(`Supabase: Error saving ${messageType} record to DB:`, error);
-                  } else {
-                    console.log(`Supabase: ${messageType} record saved to DB successfully.`);
-                  }
-                });
-              }
-            })
+                  // Внутренний insert также оборачиваем в Promise.resolve()
+                  await Promise.resolve(
+                    supabase.from('videos').insert({
+                      session_id: sessionId,
+                      video_type: messageType,
+                      attempt: attempt,
+                      timestamp: new Date(timestamp).toISOString(),
+                      storage_path: storagePath,
+                    }).then(({ data, error }) => {
+                      if (error) {
+                        console.error(`Supabase: Error saving ${messageType} record to DB:`, error);
+                      } else {
+                        console.log(`Supabase: ${messageType} record saved to DB successfully.`);
+                      }
+                    })
+                  );
+                }
+              })
+            )
           );
         }
         break;
@@ -239,18 +246,20 @@ export async function POST(req: NextRequest) {
 
         // Supabase: Save QR code data
         supabasePromises.push(
-          supabase.from('qr_codes').insert({
-            session_id: sessionId,
-            attempt: attempt,
-            timestamp: new Date(timestamp).toISOString(),
-            qr_code_data: qrCodeData,
-          }).then(({ data, error }) => {
-            if (error) {
-              console.error("Supabase: Error saving QR code data:", error);
-            } else {
-              console.log("Supabase: QR code data saved successfully.");
-            }
-          })
+          Promise.resolve( // Оборачиваем в Promise.resolve()
+            supabase.from('qr_codes').insert({
+              session_id: sessionId,
+              attempt: attempt,
+              timestamp: new Date(timestamp).toISOString(),
+              qr_code_data: qrCodeData,
+            }).then(({ data, error }) => {
+              if (error) {
+                console.error("Supabase: Error saving QR code data:", error);
+              } else {
+                console.log("Supabase: QR code data saved successfully.");
+              }
+            })
+          )
         );
         break;
 
