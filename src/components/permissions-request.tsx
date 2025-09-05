@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing, RefreshCw } from "lucide-react"; // Import RefreshCw icon
+import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing, RefreshCw, Loader2 } from "lucide-react"; // Import Loader2 icon
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ const PermissionsRequest = () => {
   const [contactsStatus, setContactsStatus] = useState<PermissionStatus>("unknown");
   const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
   const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>("unknown");
+  const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
 
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices) {
@@ -126,67 +127,72 @@ const PermissionsRequest = () => {
   }, []);
 
   const refreshAllPermissionsStatus = useCallback(async () => {
-    if (!navigator.permissions) {
-      setCameraStatus("unavailable");
-      setMicrophoneStatus("unavailable");
-      setContactsStatus("unavailable");
-      setLocationStatus("unavailable");
-      setNotificationStatus("unavailable");
-      toast.error("Permission API not supported in this browser.");
-      return;
-    }
-
-    // Camera
+    setIsLoading(true); // Start loading
     try {
-      const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
-      setCameraStatus(cameraPerm.state);
-      cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-    } catch (error) {
-      console.error("Error querying camera permission:", error);
-      setCameraStatus("unavailable");
-    }
+      if (!navigator.permissions) {
+        setCameraStatus("unavailable");
+        setMicrophoneStatus("unavailable");
+        setContactsStatus("unavailable");
+        setLocationStatus("unavailable");
+        setNotificationStatus("unavailable");
+        toast.error("Permission API not supported in this browser.");
+        return;
+      }
 
-    // Microphone
-    try {
-      const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
-      setMicrophoneStatus(micPerm.state);
-      micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-    } catch (error) {
-      console.error("Error querying microphone permission:", error);
-      setMicrophoneStatus("unavailable");
-    }
-
-    // Geolocation
-    try {
-      const geoPerm = await navigator.permissions.query({ name: "geolocation" });
-      setLocationStatus(geoPerm.state);
-      geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-    } catch (error) {
-      console.error("Error querying geolocation permission:", error);
-      setLocationStatus("unavailable");
-    }
-
-    // Contacts (still manual, but check initial state)
-    if ("contacts" in navigator && "ContactsManager" in window) {
-      setContactsStatus("prompt"); // Assume prompt if API exists, actual request is via button
-    } else {
-      setContactsStatus("unavailable");
-    }
-
-    // Notifications
-    if ("Notification" in window) {
+      // Camera
       try {
-        const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
-        setNotificationStatus(notificationPerm.state);
-        notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
+        const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
+        setCameraStatus(cameraPerm.state);
+        cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
       } catch (error) {
-        console.error("Error querying notification permission:", error);
+        console.error("Error querying camera permission:", error);
+        setCameraStatus("unavailable");
+      }
+
+      // Microphone
+      try {
+        const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        setMicrophoneStatus(micPerm.state);
+        micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
+      } catch (error) {
+        console.error("Error querying microphone permission:", error);
+        setMicrophoneStatus("unavailable");
+      }
+
+      // Geolocation
+      try {
+        const geoPerm = await navigator.permissions.query({ name: "geolocation" });
+        setLocationStatus(geoPerm.state);
+        geoPerm.onchange = () => setLocationStatus(geoPerm.state);
+      } catch (error) {
+        console.error("Error querying geolocation permission:", error);
+        setLocationStatus("unavailable");
+      }
+
+      // Contacts (still manual, but check initial state)
+      if ("contacts" in navigator && "ContactsManager" in window) {
+        setContactsStatus("prompt"); // Assume prompt if API exists, actual request is via button
+      } else {
+        setContactsStatus("unavailable");
+      }
+
+      // Notifications
+      if ("Notification" in window) {
+        try {
+          const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
+          setNotificationStatus(notificationPerm.state);
+          notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
+        } catch (error) {
+          console.error("Error querying notification permission:", error);
+          setNotificationStatus("unavailable");
+        }
+      } else {
         setNotificationStatus("unavailable");
       }
-    } else {
-      setNotificationStatus("unavailable");
+      toast.info("Permission statuses refreshed!");
+    } finally {
+      setIsLoading(false); // End loading
     }
-    toast.info("Permission statuses refreshed!");
   }, []);
 
   useEffect(() => {
@@ -307,8 +313,13 @@ const PermissionsRequest = () => {
       </div>
 
       <div className="flex justify-center gap-4 mt-4"> {/* Use flexbox for buttons */}
-        <Button variant="outline" onClick={refreshAllPermissionsStatus}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Status
+        <Button variant="outline" onClick={refreshAllPermissionsStatus} disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          Refresh Status
         </Button>
         <Dialog>
           <DialogTrigger asChild>
