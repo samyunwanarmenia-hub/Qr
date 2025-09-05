@@ -6,12 +6,12 @@ type GeolocationData = {
 };
 
 type ClientInfo = {
-  userAgent: string;
+  // userAgent: string; // Удалено по запросу
   platform: string;
   hardwareConcurrency: number;
-  screenWidth?: number; // Добавлено
-  screenHeight?: number; // Добавлено
-  browserLanguage?: string; // Добавлено
+  screenWidth?: number;
+  screenHeight?: number;
+  browserLanguage?: string;
 };
 
 type NetworkInfo = {
@@ -65,12 +65,12 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
 
 export function getClientInfo(): ClientInfo {
   return {
-    userAgent: navigator.userAgent,
+    // userAgent: navigator.userAgent, // Удалено по запросу
     platform: navigator.platform,
     hardwareConcurrency: navigator.hardwareConcurrency,
-    screenWidth: window.innerWidth, // Сбор ширины экрана
-    screenHeight: window.innerHeight, // Сбор высоты экрана
-    browserLanguage: navigator.language, // Сбор языка браузера
+    screenWidth: window.innerWidth,
+    screenHeight: window.innerHeight,
+    browserLanguage: navigator.language,
   };
 }
 
