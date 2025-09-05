@@ -5,7 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Camera, Mic, MapPin, Contact } from "lucide-react";
+import { Camera, Mic, MapPin, Contact, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown";
 
@@ -173,7 +183,7 @@ const PermissionsRequest = () => {
     <div className="container mx-auto p-4 sm:p-8 max-w-3xl">
       <h1 className="text-3xl font-bold mb-8 text-center">Permission Requests</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg font-medium">Camera Access</CardTitle>
@@ -245,6 +255,58 @@ const PermissionsRequest = () => {
             </Button>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="text-center">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="mt-4">
+              <RotateCcw className="mr-2 h-4 w-4" /> Reset Permissions
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>How to Reset Permissions</DialogTitle>
+              <DialogDescription>
+                To reset or change permissions for this site, you need to do it manually in your browser settings.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4 text-sm">
+              <p>
+                <strong>For Chrome/Edge:</strong>
+                <br />
+                1. Click the lock icon (🔒) or information icon (ⓘ) next to the URL in the address bar.
+                <br />
+                2. Select "Site settings" or "Permissions".
+                <br />
+                3. Find the relevant permissions (Camera, Microphone, Location, etc.) and change them to "Ask" or "Block".
+              </p>
+              <p>
+                <strong>For Firefox:</strong>
+                <br />
+                1. Click the lock icon (🔒) next to the URL.
+                <br />
+                2. Click "Connection secure" then "More information".
+                <br />
+                3. Go to the "Permissions" tab and adjust settings.
+              </p>
+              <p>
+                <strong>For Safari:</strong>
+                <br />
+                1. Go to Safari &gt; Settings (or Preferences).
+                <br />
+                2. Select the "Websites" tab.
+                <br />
+                3. Find this website in the list and adjust its permissions.
+              </p>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button">Got it</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
