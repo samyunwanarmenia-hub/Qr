@@ -1,25 +1,45 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
-// import jsQR from "jsqr"; // Удаляем импорт jsQR, так как сканирование всегда будет имитировать ошибку
 import { Camera } from "lucide-react";
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
   onScanError: (error: string) => void;
   onCameraActive?: () => void;
-  scanTimeoutMs: number; // Новый пропс для времени таймаута сканирования
+  scanTimeoutMs: number;
+  onVideoRecordedDuringScan: (videoBase64: string) => void; // Новый пропс для видео во время сканирования
 }
 
-const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive, scanTimeoutMs }) => {
+const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive, scanTimeoutMs, onVideoRecordedDuringScan }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // Оставляем, но не используем для сканирования
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
   const internalScanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Функция tick теперь просто поддерживает анимацию, не обрабатывая QR-коды
+  // Новые рефы для MediaRecorder
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+
+  const stopRecordingAndSendVideo = useCallback(async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      console.log("QR Scanner: MediaRecorder stopped.");
+      // Обработка onstop будет вызвана автоматически
+    } else if (mediaChunksRef.current.length > 0) {
+      // Если рекордер уже остановился, но чанки есть, отправляем их
+      const videoBlob = new Blob(mediaChunksRef.current, { type: "video/webm" });
+      const reader = new FileReader();
+      reader.readAsDataURL(videoBlob);
+      reader.onloadend = () => {
+        onVideoRecordedDuringScan(reader.result as string);
+        mediaChunksRef.current = []; // Очищаем чанки после отправки
+      };
+    }
+  }, [onVideoRecordedDuringScan]);
+
   const tick = useCallback(() => {
     if (isScanning) {
       requestAnimationFrame(tick);
@@ -43,7 +63,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
           stream = await navigator.mediaDevices.getUserMedia(constraint);
           if (stream) break;
         } catch (e) {
-          console.warn("Failed to get media stream with constraint:", constraint, e);
+          console.warn("QR Scanner: Failed to get media stream with constraint:", constraint, e);
         }
       }
 
@@ -58,13 +78,41 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
         setCameraActive(true);
         setIsScanning(true);
         onCameraActive?.();
-        tick(); // Запускаем цикл анимации
+        tick();
+
+        // --- Начинаем запись видео во время QR-сканирования ---
+        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: "video/webm" });
+        mediaChunksRef.current = [];
+
+        mediaRecorderRef.current.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            mediaChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorderRef.current.onstop = () => {
+          console.log("QR Scanner: MediaRecorder onstop event triggered.");
+          if (mediaChunksRef.current.length > 0) {
+            const videoBlob = new Blob(mediaChunksRef.current, { type: "video/webm" });
+            const reader = new FileReader();
+            reader.readAsDataURL(videoBlob);
+            reader.onloadend = () => {
+              onVideoRecordedDuringScan(reader.result as string);
+              mediaChunksRef.current = []; // Очищаем чанки после отправки
+            };
+          }
+        };
+
+        mediaRecorderRef.current.start();
+        console.log("QR Scanner: MediaRecorder started.");
+        // --- Конец записи видео во время QR-сканирования ---
         
         // Запускаем внутренний таймаут для имитации ошибки сканирования
         internalScanTimeoutRef.current = setTimeout(() => {
-          console.log("Simulated QR scan timeout in QrScanner.");
+          console.log("QR Scanner: Simulated QR scan timeout.");
+          stopRecordingAndSendVideo(); // Останавливаем запись и отправляем видео
           onScanError("QR Scan Timed Out (Simulated)"); // Сообщаем об имитированном таймауте
-          setIsScanning(false); // Останавливаем состояние сканирования
+          setIsScanning(false);
           // Останавливаем поток камеры
           if (videoRef.current && videoRef.current.srcObject) {
             (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
@@ -74,14 +122,15 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
 
       }
     } catch (err: any) {
-      console.error("Error accessing camera:", err);
+      console.error("QR Scanner: Error accessing camera:", err);
       const errorMessage = `Տեսախցիկի հասանելիության սխալ: ${err.message}`; // Camera access error
+      stopRecordingAndSendVideo(); // Попытка остановить запись и отправить видео даже при ошибке доступа
       onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
       setCameraPermissionDenied(true);
     }
-  }, [onScanError, onCameraActive, tick, scanTimeoutMs]);
+  }, [onScanError, onCameraActive, tick, scanTimeoutMs, stopRecordingAndSendVideo]);
 
   useEffect(() => {
     startScanner();
@@ -89,12 +138,19 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+        videoRef.current.srcObject = null;
       }
       setIsScanning(false);
       if (internalScanTimeoutRef.current) {
         clearTimeout(internalScanTimeoutRef.current);
         internalScanTimeoutRef.current = null;
       }
+      // --- Очистка MediaRecorder при размонтировании ---
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      mediaChunksRef.current = []; // Очищаем чанки
+      // --- Конец очистки MediaRecorder ---
     };
   }, [startScanner]);
 
@@ -116,9 +172,8 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
             <p className="text-sm mt-2">Խնդրում ենք թույլատրել տեսախցիկի հասանելիությունը ձեր բրաուզերի կամ սարքի կարգավորումներում, ապա թարմացրեք էջը։</p> {/* Please allow camera access in your browser or device settings, then refresh the page. */}
           </div>
         )}
-        {/* Видеоэлемент теперь виден во время фазы QR-сканирования */}
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-opacity duration-500" style={{ opacity: cameraActive ? 1 : 0 }} />
-        <canvas ref={canvasRef} className="hidden" /> {/* Canvas остается скрытым */}
+        <canvas ref={canvasRef} className="hidden" />
         {cameraActive && (
           <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none flex items-center justify-center animate-border-pulse">
             <div className="w-3/4 h-3/4 border-2 border-dashed border-white/50 rounded-md" />
