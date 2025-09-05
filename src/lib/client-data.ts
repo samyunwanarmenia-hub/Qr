@@ -22,11 +22,11 @@ type BatteryInfo = {
   charging?: boolean;
 };
 
-type PermissionStatus = {
+export type PermissionStatus = { // <-- Добавлено 'export'
   geolocation: string;
   camera: string;
   microphone: string;
-  battery: string; // Добавлено свойство battery
+  battery: string;
 };
 
 export async function getGeolocation(): Promise<{ data?: GeolocationData; status: string }> {
@@ -109,7 +109,7 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
     geolocation: "Unknown",
     camera: "Unknown",
     microphone: "Unknown",
-    battery: "Unknown", // Инициализируем battery
+    battery: "Unknown",
   };
 
   if ("permissions" in navigator) {
@@ -123,13 +123,10 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
       const microphoneStatus = await navigator.permissions.query({ name: "microphone" });
       permissions.microphone = microphoneStatus.state;
       
-      // Battery permission is not queryable via Permissions API, it's checked via getBattery()
-      // So we'll leave it as "Unknown" or it will be updated by getBatteryInfo
     } catch (error) {
       console.error("Error querying permissions:", error);
     }
   } else {
-    // Fallback for browsers that don't support navigator.permissions.query
     permissions.geolocation = "Prompt/Unknown (API not supported)";
     permissions.camera = "Prompt/Unknown (API not supported)";
     permissions.microphone = "Prompt/Unknown (API not supported)";
@@ -138,6 +135,3 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
 
   return permissions;
 }
-
-// Note: Direct programmatic access to a user's phone number from a web browser is not possible
-// without explicit user input or an authentication flow.
