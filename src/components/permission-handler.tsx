@@ -129,6 +129,10 @@ const PermissionHandler = () => {
       // Stop all tracks after processing, regardless of success or failure
       if (stream) {
         (stream as MediaStream).getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        // Clear the video source object for proper resource management
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
       }
       setIsProcessing(false);
     };
