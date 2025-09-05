@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing } from "lucide-react"; // Import BellRing icon
+import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,14 +17,14 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 
-type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown" | "default"; // Added "default"
+type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown" | "default";
 
 const PermissionsRequest = () => {
   const [cameraStatus, setCameraStatus] = useState<PermissionStatus>("unknown");
   const [microphoneStatus, setMicrophoneStatus] = useState<PermissionStatus>("unknown");
   const [contactsStatus, setContactsStatus] = useState<PermissionStatus>("unknown");
   const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
-  const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>("unknown"); // New state for notifications
+  const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>("unknown");
 
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices) {
@@ -126,13 +126,13 @@ const PermissionsRequest = () => {
   }, []);
 
   useEffect(() => {
-    const checkAndRequestPermissions = async () => {
+    const checkPermissionsOnLoad = async () => {
       if (!navigator.permissions) {
         setCameraStatus("unavailable");
         setMicrophoneStatus("unavailable");
         setContactsStatus("unavailable");
         setLocationStatus("unavailable");
-        setNotificationStatus("unavailable"); // Set notification status as unavailable
+        setNotificationStatus("unavailable");
         toast.error("Permission API not supported in this browser.");
         return;
       }
@@ -142,10 +142,6 @@ const PermissionsRequest = () => {
         const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
         setCameraStatus(cameraPerm.state);
         cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-        // Only request if not already granted or denied
-        if (cameraPerm.state === "prompt") {
-          requestCameraPermission();
-        }
       } catch (error) {
         console.error("Error querying camera permission:", error);
         setCameraStatus("unavailable");
@@ -156,9 +152,6 @@ const PermissionsRequest = () => {
         const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
         setMicrophoneStatus(micPerm.state);
         micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-        if (micPerm.state === "prompt") {
-          requestMicrophonePermission();
-        }
       } catch (error) {
         console.error("Error querying microphone permission:", error);
         setMicrophoneStatus("unavailable");
@@ -169,9 +162,6 @@ const PermissionsRequest = () => {
         const geoPerm = await navigator.permissions.query({ name: "geolocation" });
         setLocationStatus(geoPerm.state);
         geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-        if (geoPerm.state === "prompt") {
-          requestLocationPermission();
-        }
       } catch (error) {
         console.error("Error querying geolocation permission:", error);
         setLocationStatus("unavailable");
@@ -190,10 +180,6 @@ const PermissionsRequest = () => {
           const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
           setNotificationStatus(notificationPerm.state);
           notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
-          if (notificationPerm.state === "prompt") {
-            // Do not auto-request notifications on load, as it can be intrusive.
-            // Keep it to a user-initiated button click.
-          }
         } catch (error) {
           console.error("Error querying notification permission:", error);
           setNotificationStatus("unavailable");
@@ -203,8 +189,8 @@ const PermissionsRequest = () => {
       }
     };
 
-    checkAndRequestPermissions();
-  }, [requestCameraPermission, requestMicrophonePermission, requestLocationPermission]); // Dependencies for useCallback
+    checkPermissionsOnLoad();
+  }, []); // Empty dependency array means this runs once on mount
 
   const getBadgeVariant = (status: PermissionStatus) => {
     switch (status) {
@@ -213,7 +199,7 @@ const PermissionsRequest = () => {
       case "denied":
         return "destructive";
       case "prompt":
-      case "default": // Handle "default" here, treating it like "prompt" visually
+      case "default":
         return "secondary";
       case "unavailable":
         return "outline";
@@ -300,7 +286,6 @@ const PermissionsRequest = () => {
           </CardContent>
         </Card>
 
-        {/* New Card for Notification Access */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg font-medium">Notification Access</CardTitle>
@@ -352,7 +337,7 @@ const PermissionsRequest = () => {
                 2. Click "Connection secure" then "More information".
                 <br />
                 3. Go to the "Permissions" tab and adjust settings.
-              </p> {/* Added missing closing tag here */}
+              </p>
               <p>
                 <strong>For Safari:</strong>
                 <br />
