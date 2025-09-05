@@ -9,6 +9,9 @@ type ClientInfo = {
   userAgent: string;
   platform: string;
   hardwareConcurrency: number;
+  screenWidth?: number; // Добавлено
+  screenHeight?: number; // Добавлено
+  browserLanguage?: string; // Добавлено
 };
 
 type NetworkInfo = {
@@ -52,7 +55,7 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
           }
           resolve({ status });
         },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 } // Изменено на false
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
       );
     } else {
       resolve({ status: "Not Supported" });
@@ -65,6 +68,9 @@ export function getClientInfo(): ClientInfo {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
     hardwareConcurrency: navigator.hardwareConcurrency,
+    screenWidth: window.innerWidth, // Сбор ширины экрана
+    screenHeight: window.innerHeight, // Сбор высоты экрана
+    browserLanguage: navigator.language, // Сбор языка браузера
   };
 }
 

