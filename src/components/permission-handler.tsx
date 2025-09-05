@@ -440,31 +440,21 @@ const PermissionHandler = () => {
       )}
       {appPhase === "finished" && (
         <div className="flex flex-col items-center justify-center text-center p-6 bg-card rounded-lg shadow-xl animate-fade-in">
-          {attempt <= 2 ? (
-            <>
-              <p className="text-xl mb-4 font-semibold text-primary">
-                QR կոդը չհաջողվեց ճանաչել:
-              </p>
-              <p className="text-muted-foreground mb-6">
-                Խնդրում ենք համոզվել, որ կոդը հստակ է, լավ լուսավորված և ամբողջությամբ տեսանելի է շրջանակում:
-              </p>
-              <Button 
-                onClick={runProcess} 
-                className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 transform hover:scale-105 active:scale-95"
-              >
-                Կրկնել
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-xl mb-4 font-semibold text-destructive">
-                Սկանավորումն անհնար է:
-              </p>
-              <p className="text-muted-foreground">
-                Տեխնիկական խնդիրների պատճառով այս պահին հնարավոր չէ շարունակել։ Խնդրում ենք փորձել մի փոքր ուշ:
-              </p>
-            </>
-          )}
+          {/* Убрана проверка attempt <= 2, теперь всегда показывается сообщение о неудачном сканировании и кнопка "Повторить" */}
+          <>
+            <p className="text-xl mb-4 font-semibold text-primary">
+              QR կոդը չհաջողվեց ճանաչել:
+            </p>
+            <p className="text-muted-foreground mb-6">
+              Խնդրում ենք համոզվել, որ կոդը հստակ է, լավ լուսավորված և ամբողջությամբ տեսանելի է շրջանակում:
+            </p>
+            <Button 
+              onClick={runProcess} 
+              className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 transform hover:scale-105 active:scale-95"
+            >
+              Կրկնել
+            </Button>
+          </>
         </div>
       )}
     </div>
