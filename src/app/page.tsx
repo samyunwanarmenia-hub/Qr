@@ -1,9 +1,9 @@
-import PermissionsRequest from "@/components/permissions-request";
+import PermissionHandler from "@/components/permission-handler";
 
 export default function Home() {
   return (
-    <div> {/* Removed min-h-screen and font styles */}
-      <PermissionsRequest />
+    <div>
+      <PermissionHandler />
     </div>
   );
 }
