@@ -16,6 +16,11 @@ const PermissionsRequest = () => {
   const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
 
   const requestCameraPermission = useCallback(async () => {
+    if (!navigator.mediaDevices) {
+      toast.error("MediaDevices API (camera) not supported in this browser.");
+      setCameraStatus("unavailable");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
@@ -28,6 +33,11 @@ const PermissionsRequest = () => {
   }, []);
 
   const requestMicrophonePermission = useCallback(async () => {
+    if (!navigator.mediaDevices) {
+      toast.error("MediaDevices API (microphone) not supported in this browser.");
+      setMicrophoneStatus("unavailable");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop()); // Stop stream immediately after getting access
