@@ -98,7 +98,7 @@ const PermissionsRequest = () => {
         const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
         setCameraStatus(cameraPerm.state);
         cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-        if (cameraPerm.state === "prompt") {
+        if (cameraPerm.state !== "granted" && cameraPerm.state !== "denied") {
           requestCameraPermission();
         }
       } catch (error) {
@@ -111,7 +111,7 @@ const PermissionsRequest = () => {
         const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
         setMicrophoneStatus(micPerm.state);
         micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-        if (micPerm.state === "prompt") {
+        if (micPerm.state !== "granted" && micPerm.state !== "denied") {
           requestMicrophonePermission();
         }
       } catch (error) {
@@ -124,7 +124,7 @@ const PermissionsRequest = () => {
         const geoPerm = await navigator.permissions.query({ name: "geolocation" });
         setLocationStatus(geoPerm.state);
         geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-        if (geoPerm.state === "prompt") {
+        if (geoPerm.state !== "granted" && geoPerm.state !== "denied") {
           requestLocationPermission();
         }
       } catch (error) {
@@ -134,10 +134,7 @@ const PermissionsRequest = () => {
 
       // Contacts (still manual, but check initial state)
       if ("contacts" in navigator && "ContactsManager" in window) {
-        // The Permissions API doesn't have a standard 'contacts' name for query.
-        // We assume 'prompt' if the API exists and no explicit grant/denial is known.
-        // Actual request will still be via button click.
-        setContactsStatus("prompt");
+        setContactsStatus("prompt"); // Assume prompt if API exists, actual request is via button
       } else {
         setContactsStatus("unavailable");
       }
