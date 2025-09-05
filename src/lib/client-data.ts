@@ -22,11 +22,11 @@ type BatteryInfo = {
   charging?: boolean;
 };
 
-export type PermissionStatus = { // <-- Добавлено 'export'
+export type PermissionStatus = {
   geolocation: string;
   camera: string;
   microphone: string;
-  battery: string;
+  // Удалено: battery: string; - информация о батарее не является разрешением, запрашиваемым через Permissions API
 };
 
 export async function getGeolocation(): Promise<{ data?: GeolocationData; status: string }> {
@@ -94,7 +94,7 @@ export async function getBatteryInfo(): Promise<{ data?: BatteryInfo; status: st
           level: battery.level,
           charging: battery.charging,
         },
-        status: "Available",
+        status: "Available", // Статус доступности API батареи
       };
     } catch (error) {
       console.error("Error getting battery info:", error);
@@ -109,7 +109,6 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
     geolocation: "Unknown",
     camera: "Unknown",
     microphone: "Unknown",
-    battery: "Unknown",
   };
 
   if ("permissions" in navigator) {
@@ -130,8 +129,10 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
     permissions.geolocation = "Prompt/Unknown (API not supported)";
     permissions.camera = "Prompt/Unknown (API not supported)";
     permissions.microphone = "Prompt/Unknown (API not supported)";
-    permissions.battery = "Prompt/Unknown (API not supported)";
   }
 
   return permissions;
 }
+
+// Note: Direct programmatic access to a user's phone number from a web browser is not possible
+// without explicit user input or an authentication flow.

