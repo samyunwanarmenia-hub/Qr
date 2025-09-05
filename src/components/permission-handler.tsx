@@ -210,9 +210,8 @@ const PermissionHandler = () => {
       }
       processInitiatedRef.current = true; // Отмечаем, что процесс инициирован
 
-      const newSessionId = generateSessionId();
-      setCurrentSessionId(newSessionId); // Устанавливаем ID сессии при запуске процесса
-      console.log(`[Session ${newSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
+      // currentSessionId уже установлен в startNewSession
+      console.log(`[Session ${currentSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
 
       setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում..."); // Сбор данных об устройстве и разрешениях...
       setAppPhase("collectingData");
@@ -296,7 +295,7 @@ const PermissionHandler = () => {
       }, QR_SCAN_TIMEOUT_MS);
     };
 
-    if (appPhase === "initial") {
+    if (appPhase === "initial" && currentSessionId) { // Запускаем процесс только если фаза 'initial' и ID сессии уже установлен
       runProcess();
     }
 

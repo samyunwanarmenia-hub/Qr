@@ -16,8 +16,10 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false); // New state for permission denial
 
   const startScanner = useCallback(async () => {
+    setCameraPermissionDenied(false); // Reset on new attempt
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { exact: "environment" } }, // Request back camera
@@ -39,6 +41,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
       onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
+      setCameraPermissionDenied(true); // Set permission denied state
     }
   }, [onScanError, onCameraActive]);
 
@@ -89,11 +92,18 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <h2 className="text-2xl font-bold mb-4">Сканирование QR-кода</h2>
       <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
-        {!cameraActive && (
+        {!cameraActive && !cameraPermissionDenied && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
             <Camera size={48} className="mb-2" />
             <p>Ожидание доступа к камере...</p>
             <p className="text-sm text-center px-4">Пожалуйста, предоставьте разрешение на использование камеры для сканирования QR-кодов.</p>
+          </div>
+        )}
+        {cameraPermissionDenied && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-destructive-foreground bg-destructive/20 p-4 text-center">
+            <Camera size={48} className="mb-2 text-destructive" />
+            <p className="font-bold text-destructive">Доступ к камере отклонен!</p>
+            <p className="text-sm mt-2">Пожалуйста, разрешите доступ к камере в настройках вашего браузера или устройства, затем обновите страницу.</p>
           </div>
         )}
         <video ref={videoRef} className="w-full h-full object-cover" style={{ display: cameraActive ? 'block' : 'none' }} />
