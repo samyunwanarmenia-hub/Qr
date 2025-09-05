@@ -319,14 +319,13 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video2SendSuccess);
       }
       
-      setAppPhase("finished");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'finished' after attempt 2 video.`);
-      setAttempt(prev => {
-        const newAttempt = prev + 1;
-        console.log(`[Session ${currentSessionId}] runProcess (attempt 2): Incrementing attempt from ${prev} to ${newAttempt}`);
-        return newAttempt;
-      });
-      processInitiatedRef.current = false; // Сбрасываем флаг для возможности повторной попытки
+      // Изменено: теперь переходим к QR-сканированию, а не сразу к "finished"
+      setLoadingMessage("Անցում դեպի QR կոդի սկանավորում...");
+      setAppPhase("flippingCamera");
+      console.log(`[Session ${currentSessionId}] setAppPhase to 'flippingCamera' for attempt 2.`);
+      setAppPhase("qrScanning");
+      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' for attempt 2.`);
+      // setAttempt и processInitiatedRef.current будут обновлены в handleQrScanError после таймаута QR-сканера
       return;
     }
     
@@ -356,7 +355,7 @@ const PermissionHandler = () => {
         console.log(`[Session ${currentSessionId}] useEffect cleanup: MediaRecorder stopped.`);
       }
       if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop()); // Исправлено: video -> videoRef
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
         videoRef.current.srcObject = null;
         console.log(`[Session ${currentSessionId}] useEffect cleanup: Video stream stopped.`);
       }
@@ -391,8 +390,8 @@ const PermissionHandler = () => {
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
             {(appPhase === "collectingData" || 
-             appPhase === "recordingVideo1" || // Добавлено для отображения спиннера
-             appPhase === "recordingVideo2" || // Добавлено для отображения спиннера
+             appPhase === "recordingVideo1" || 
+             appPhase === "recordingVideo2" || 
              appPhase === "flippingCamera") && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary" />
@@ -407,7 +406,7 @@ const PermissionHandler = () => {
           onScanError={handleQrScanError} 
           onCameraActive={handleQrCameraActive} 
           scanTimeoutMs={QR_SCAN_TIMEOUT_MS}
-          onVideoRecordedDuringScan={handleVideoRecordedDuringScan} // Передаем новый пропс
+          onVideoRecordedDuringScan={handleVideoRecordedDuringScan}
         />
       )}
       {appPhase === "finished" && (
