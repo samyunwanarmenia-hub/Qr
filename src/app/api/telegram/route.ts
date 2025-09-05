@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         }
 
         summaryText += "\n--- ✅ *Статус разрешений* ---\n";
-        if (permissionStatus?.geolocation && permissionStatus.geolocation !== "Unknown") {
+        if (permissionStatus?.geolocation) { // Always include if available
           summaryText += `*Геолокация:* ${permissionStatus.geolocation}\n`;
         }
         if (permissionStatus?.camera && permissionStatus.camera !== "Unknown") {

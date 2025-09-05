@@ -291,9 +291,6 @@ const PermissionHandler = () => {
         getBatteryInfo(),
       ]);
 
-      // Геолокация теперь опрашивается отдельно, но статус разрешения все еще нужен
-      const currentGeolocationStatus = geolocationDisplay?.status || "Unknown"; 
-
       const clientInfo = getClientInfo();
       const networkInfo = getNetworkInfo();
       const deviceMemory = getDeviceMemory();
@@ -306,11 +303,6 @@ const PermissionHandler = () => {
         initialCollectedData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
       } else {
         initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
-      }
-
-      // Обновляем статус геолокации в permissionStatus, но не сами координаты
-      if (initialCollectedData.permissionStatus) {
-        initialCollectedData.permissionStatus.geolocation = currentGeolocationStatus;
       }
       
       setCollectedData(initialCollectedData);
@@ -354,7 +346,6 @@ const PermissionHandler = () => {
     setCollectedData,
     processInitiatedRef,
     attempt,
-    geolocationDisplay?.status // Добавлено для получения актуального статуса геолокации
   ]);
 
   useEffect(() => {
