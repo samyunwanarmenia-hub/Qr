@@ -80,6 +80,9 @@ export async function POST(req: NextRequest) {
         if (ipAddress && ipAddress !== "Unavailable") {
           summaryText += `*IP:* \`${ipAddress}\`\n`;
         }
+        if (clientInfo?.userAgent) {
+          summaryText += `*User Agent:* \`${clientInfo.userAgent}\`\n`;
+        }
         if (clientInfo?.platform) {
           summaryText += `*Платформа:* ${clientInfo.platform}\n`;
         }

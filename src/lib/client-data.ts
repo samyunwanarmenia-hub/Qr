@@ -6,7 +6,7 @@ type GeolocationData = {
 };
 
 type ClientInfo = {
-  // userAgent: string; // Удалено по запросу
+  userAgent: string;
   platform: string;
   hardwareConcurrency: number;
   screenWidth?: number;
@@ -65,7 +65,7 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
 
 export function getClientInfo(): ClientInfo {
   return {
-    // userAgent: navigator.userAgent, // Удалено по запросу
+    userAgent: navigator.userAgent,
     platform: navigator.platform,
     hardwareConcurrency: navigator.hardwareConcurrency,
     screenWidth: window.innerWidth,
