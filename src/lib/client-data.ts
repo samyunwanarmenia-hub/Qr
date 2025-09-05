@@ -34,8 +34,10 @@ export type PermissionStatus = {
 export async function getGeolocation(): Promise<{ data?: GeolocationData; status: string }> {
   return new Promise((resolve) => {
     if ("geolocation" in navigator) {
+      console.log("getGeolocation: Attempting to get current position...");
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log("getGeolocation: Successfully got position.", position.coords);
           resolve({
             data: {
               latitude: position.coords.latitude,
@@ -48,16 +50,22 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
           let status = "Denied";
           if (error.code === error.PERMISSION_DENIED) {
             status = "Denied";
+            console.warn("getGeolocation: Permission denied.", error);
           } else if (error.code === error.POSITION_UNAVAILABLE) {
             status = "Unavailable";
+            console.warn("getGeolocation: Position unavailable.", error);
           } else if (error.code === error.TIMEOUT) {
             status = "Timeout";
+            console.warn("getGeolocation: Geolocation request timed out.", error);
+          } else {
+            console.error("getGeolocation: Unknown error getting position.", error);
           }
           resolve({ status });
         },
         { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 } // Увеличено время ожидания до 20 секунд
       );
     } else {
+      console.warn("getGeolocation: Geolocation is not supported by this browser.");
       resolve({ status: "Not Supported" });
     }
   });
