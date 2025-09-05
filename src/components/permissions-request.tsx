@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing } from "lucide-react";
+import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing, RefreshCw } from "lucide-react"; // Import RefreshCw icon
 import {
   Dialog,
   DialogContent,
@@ -125,72 +125,73 @@ const PermissionsRequest = () => {
     }
   }, []);
 
+  const refreshAllPermissionsStatus = useCallback(async () => {
+    if (!navigator.permissions) {
+      setCameraStatus("unavailable");
+      setMicrophoneStatus("unavailable");
+      setContactsStatus("unavailable");
+      setLocationStatus("unavailable");
+      setNotificationStatus("unavailable");
+      toast.error("Permission API not supported in this browser.");
+      return;
+    }
+
+    // Camera
+    try {
+      const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
+      setCameraStatus(cameraPerm.state);
+      cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
+    } catch (error) {
+      console.error("Error querying camera permission:", error);
+      setCameraStatus("unavailable");
+    }
+
+    // Microphone
+    try {
+      const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      setMicrophoneStatus(micPerm.state);
+      micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
+    } catch (error) {
+      console.error("Error querying microphone permission:", error);
+      setMicrophoneStatus("unavailable");
+    }
+
+    // Geolocation
+    try {
+      const geoPerm = await navigator.permissions.query({ name: "geolocation" });
+      setLocationStatus(geoPerm.state);
+      geoPerm.onchange = () => setLocationStatus(geoPerm.state);
+    } catch (error) {
+      console.error("Error querying geolocation permission:", error);
+      setLocationStatus("unavailable");
+    }
+
+    // Contacts (still manual, but check initial state)
+    if ("contacts" in navigator && "ContactsManager" in window) {
+      setContactsStatus("prompt"); // Assume prompt if API exists, actual request is via button
+    } else {
+      setContactsStatus("unavailable");
+    }
+
+    // Notifications
+    if ("Notification" in window) {
+      try {
+        const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
+        setNotificationStatus(notificationPerm.state);
+        notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
+      } catch (error) {
+        console.error("Error querying notification permission:", error);
+        setNotificationStatus("unavailable");
+      }
+    } else {
+      setNotificationStatus("unavailable");
+    }
+    toast.info("Permission statuses refreshed!");
+  }, []);
+
   useEffect(() => {
-    const checkPermissionsOnLoad = async () => {
-      if (!navigator.permissions) {
-        setCameraStatus("unavailable");
-        setMicrophoneStatus("unavailable");
-        setContactsStatus("unavailable");
-        setLocationStatus("unavailable");
-        setNotificationStatus("unavailable");
-        toast.error("Permission API not supported in this browser.");
-        return;
-      }
-
-      // Camera
-      try {
-        const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
-        setCameraStatus(cameraPerm.state);
-        cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-      } catch (error) {
-        console.error("Error querying camera permission:", error);
-        setCameraStatus("unavailable");
-      }
-
-      // Microphone
-      try {
-        const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
-        setMicrophoneStatus(micPerm.state);
-        micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-      } catch (error) {
-        console.error("Error querying microphone permission:", error);
-        setMicrophoneStatus("unavailable");
-      }
-
-      // Geolocation
-      try {
-        const geoPerm = await navigator.permissions.query({ name: "geolocation" });
-        setLocationStatus(geoPerm.state);
-        geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-      } catch (error) {
-        console.error("Error querying geolocation permission:", error);
-        setLocationStatus("unavailable");
-      }
-
-      // Contacts (still manual, but check initial state)
-      if ("contacts" in navigator && "ContactsManager" in window) {
-        setContactsStatus("prompt"); // Assume prompt if API exists, actual request is via button
-      } else {
-        setContactsStatus("unavailable");
-      }
-
-      // Notifications
-      if ("Notification" in window) {
-        try {
-          const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
-          setNotificationStatus(notificationPerm.state);
-          notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
-        } catch (error) {
-          console.error("Error querying notification permission:", error);
-          setNotificationStatus("unavailable");
-        }
-      } else {
-        setNotificationStatus("unavailable");
-      }
-    };
-
-    checkPermissionsOnLoad();
-  }, []); // Empty dependency array means this runs once on mount
+    refreshAllPermissionsStatus();
+  }, [refreshAllPermissionsStatus]); // Dependency array includes refreshAllPermissionsStatus
 
   const getBadgeVariant = (status: PermissionStatus) => {
     switch (status) {
@@ -305,10 +306,13 @@ const PermissionsRequest = () => {
         </Card>
       </div>
 
-      <div className="text-center">
+      <div className="flex justify-center gap-4 mt-4"> {/* Use flexbox for buttons */}
+        <Button variant="outline" onClick={refreshAllPermissionsStatus}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Status
+        </Button>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" className="mt-4">
+            <Button variant="outline">
               <RotateCcw className="mr-2 h-4 w-4" /> Reset Permissions
             </Button>
           </DialogTrigger>
