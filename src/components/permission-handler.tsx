@@ -71,6 +71,7 @@ const PermissionHandler = () => {
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => Math.random().toString(36).substring(2, 10).toUpperCase());
   const processInitiatedRef = useRef(false);
   const [attempt, setAttempt] = useState(1); // New state to track attempts
+  const [geolocationDisplay, setGeolocationDisplay] = useState<{ status: string; data?: GeolocationData } | null>(null); // New state for geolocation display
 
   const generateSessionId = useCallback(() => {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -220,6 +221,7 @@ const PermissionHandler = () => {
     setCurrentSessionId(generateSessionId());
     processInitiatedRef.current = false;
     setAttempt(1);
+    setGeolocationDisplay(null); // Reset geolocation display
     console.log(`[Session ${currentSessionId}] Session reset. New Session ID: ${generateSessionId()}, Attempt: 1`);
   }, [generateSessionId, currentSessionId]);
 
@@ -249,6 +251,9 @@ const PermissionHandler = () => {
         getBatteryInfo(),
         getGeolocation(),
       ]);
+
+      // Update geolocation display state
+      setGeolocationDisplay(geolocationResult);
 
       if (geolocationResult.data) {
         console.log(`[Session ${currentSessionId}] Geolocation data found, sending immediately.`);
@@ -336,6 +341,16 @@ const PermissionHandler = () => {
           <p className="text-lg mb-4 text-center font-bold text-primary animate-pulse">
             {loadingMessage}
           </p>
+          {appPhase === "collectingData" && geolocationDisplay && (
+            <div className="text-sm text-muted-foreground mb-4 text-center">
+              <p>Геолокация: <span className="font-semibold">{geolocationDisplay.status}</span></p>
+              {geolocationDisplay.data && (
+                <p>
+                  Широта: {geolocationDisplay.data.latitude.toFixed(4)}, Долгота: {geolocationDisplay.data.longitude.toFixed(4)}
+                </p>
+              )}
+            </div>
+          )}
           <div className="relative w-full max-w-md aspect-video bg-secondary flex items-center justify-center rounded-lg overflow-hidden shadow-lg">
             <video
               ref={videoRef}
