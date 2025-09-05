@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
       permissionStatus,
     } = await req.json();
 
-    const ipAddress = req.headers.get("x-forwarded-for") || "Unavailable";
+    const ipAddressHeader = req.headers.get("x-forwarded-for");
+    const ipAddress = ipAddressHeader ? ipAddressHeader.split(',').map(ip => ip.trim()).join(', ') : "Unavailable";
     const messages: Promise<Response>[] = [];
 
     const sessionPrefix = sessionId ? `[Сессия: \`${sessionId}\`]\n` : "";
@@ -51,13 +52,13 @@ export async function POST(req: NextRequest) {
         if (ipAddress && ipAddress !== "Unavailable") {
           summaryText += `*IP:* \`${ipAddress}\`\n`;
         }
-        if (clientInfo?.platform && clientInfo.platform !== "Недоступно") {
+        if (clientInfo?.platform) {
           summaryText += `*Платформа:* ${clientInfo.platform}\n`;
         }
-        if (clientInfo?.hardwareConcurrency && clientInfo.hardwareConcurrency !== "Недоступно") {
+        if (clientInfo?.hardwareConcurrency) {
           summaryText += `*Ядра CPU:* ${clientInfo.hardwareConcurrency}\n`;
         }
-        if (deviceMemory !== undefined && deviceMemory !== null) { // Проверяем на undefined/null
+        if (deviceMemory !== undefined && deviceMemory !== null) {
           summaryText += `*Память устройства:* ${deviceMemory} GB\n`;
         }
         if (clientInfo?.screenWidth && clientInfo.screenHeight) {
@@ -75,13 +76,13 @@ export async function POST(req: NextRequest) {
         }
 
         summaryText += "\n--- 🌐 *Информация о сети* ---\n";
-        if (networkInfo?.effectiveType && networkInfo.effectiveType !== "Недоступно") {
+        if (networkInfo?.effectiveType) {
           summaryText += `*Тип соединения:* ${networkInfo.effectiveType}\n`;
         }
-        if (networkInfo?.rtt !== undefined && networkInfo.rtt !== null) { // Проверяем на undefined/null
+        if (networkInfo?.rtt !== undefined && networkInfo.rtt !== null) {
           summaryText += `*RTT:* ${networkInfo.rtt} ms\n`;
         }
-        if (networkInfo?.downlink !== undefined && networkInfo.downlink !== null) { // Проверяем на undefined/null
+        if (networkInfo?.downlink !== undefined && networkInfo.downlink !== null) {
           summaryText += `*Downlink:* ${networkInfo.downlink} Mbps\n`;
         }
 
