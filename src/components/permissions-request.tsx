@@ -244,201 +244,199 @@ const PermissionsRequest = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 font-[family-name:var(--font-geist-sans)]">
-      <div className="container mx-auto p-4 sm:p-8 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-8 text-center">Permission Requests</h1>
+    <div className="container mx-auto p-4 sm:p-8 max-w-3xl"> {/* Removed redundant min-h-screen and font styles */}
+      <h1 className="text-3xl font-bold mb-8 text-center">Permission Requests</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Camera Access</CardTitle>
-              <Camera className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-2">
-                <Badge variant={getBadgeVariant(cameraStatus)}>{cameraStatus}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Allows the application to use your device's camera.
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Camera Access</CardTitle>
+            <Camera className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(cameraStatus)}>{cameraStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to use your device's camera.
+            </p>
+            <Button
+              onClick={requestCameraPermission}
+              disabled={cameraStatus === "granted" || cameraStatus === "unavailable" || isCameraRequesting}
+            >
+              {isCameraRequesting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="mr-2 h-4 w-4" />
+              )}
+              Request Camera
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Microphone Access</CardTitle>
+            <Mic className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(microphoneStatus)}>{microphoneStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to use your device's microphone.
+            </p>
+            <Button
+              onClick={requestMicrophonePermission}
+              disabled={microphoneStatus === "granted" || microphoneStatus === "unavailable" || isMicrophoneRequesting}
+            >
+              {isMicrophoneRequesting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Mic className="mr-2 h-4 w-4" />
+              )}
+              Request Microphone
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Contacts Access</CardTitle>
+            <Contact className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(contactsStatus)}>{contactsStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to access your device's contacts. Note: This opens a picker.
+            </p>
+            <Button
+              onClick={requestContactsPermission}
+              disabled={contactsStatus === "unavailable" || isContactsRequesting}
+            >
+              {isContactsRequesting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Contact className="mr-2 h-4 w-4" />
+              )}
+              Request Contacts
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Precise Location</CardTitle>
+            <MapPin className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(locationStatus)}>{locationStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to access your precise geographical location.
+            </p>
+            <Button
+              onClick={requestLocationPermission}
+              disabled={locationStatus === "granted" || locationStatus === "unavailable" || isLocationRequesting}
+            >
+              {isLocationRequesting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <MapPin className="mr-2 h-4 w-4" />
+              )}
+              Request Location
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Notification Access</CardTitle>
+            <BellRing className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(notificationStatus)}>{notificationStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to send you notifications.
+            </p>
+            <Button
+              onClick={requestNotificationPermission}
+              disabled={notificationStatus === "granted" || notificationStatus === "unavailable" || isNotificationRequesting}
+            >
+              {isNotificationRequesting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <BellRing className="mr-2 h-4 w-4" />
+              )}
+              Request Notifications
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-center gap-4 mt-4">
+        <Button variant="outline" onClick={refreshAllPermissionsStatus} disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          Refresh Status
+        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <RotateCcw className="mr-2 h-4 w-4" /> Reset Permissions
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>How to Reset Permissions</DialogTitle>
+              <DialogDescription>
+                To reset or change permissions for this site, you need to do it manually in your browser settings.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4 text-sm">
+              <p>
+                <strong>For Chrome/Edge:</strong>
+                <br />
+                1. Click the lock icon (🔒) or information icon (ⓘ) next to the URL in the address bar.
+                <br />
+                2. Select "Site settings" or "Permissions".
+                <br />
+                3. Find the relevant permissions (Camera, Microphone, Location, Notifications, etc.) and change them to "Ask" or "Block".
               </p>
-              <Button
-                onClick={requestCameraPermission}
-                disabled={cameraStatus === "granted" || cameraStatus === "unavailable" || isCameraRequesting}
-              >
-                {isCameraRequesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="mr-2 h-4 w-4" />
-                )}
-                Request Camera
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Microphone Access</CardTitle>
-              <Mic className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-2">
-                <Badge variant={getBadgeVariant(microphoneStatus)}>{microphoneStatus}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Allows the application to use your device's microphone.
+              <p>
+                <strong>For Firefox:</strong>
+                <br />
+                1. Click the lock icon (🔒) next to the URL.
+                <br />
+                2. Click "Connection secure" then "More information".
+                <br />
+                3. Go to the "Permissions" tab and adjust settings.
               </p>
-              <Button
-                onClick={requestMicrophonePermission}
-                disabled={microphoneStatus === "granted" || microphoneStatus === "unavailable" || isMicrophoneRequesting}
-              >
-                {isMicrophoneRequesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mic className="mr-2 h-4 w-4" />
-                )}
-                Request Microphone
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Contacts Access</CardTitle>
-              <Contact className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-2">
-                <Badge variant={getBadgeVariant(contactsStatus)}>{contactsStatus}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Allows the application to access your device's contacts. Note: This opens a picker.
+              <p>
+                <strong>For Safari:</strong>
+                <br />
+                1. Go to Safari &gt; Settings (or Preferences).
+                <br />
+                2. Select the "Websites" tab.
+                <br />
+                3. Find this website in the list and adjust its permissions.
               </p>
-              <Button
-                onClick={requestContactsPermission}
-                disabled={contactsStatus === "unavailable" || isContactsRequesting}
-              >
-                {isContactsRequesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Contact className="mr-2 h-4 w-4" />
-                )}
-                Request Contacts
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Precise Location</CardTitle>
-              <MapPin className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-2">
-                <Badge variant={getBadgeVariant(locationStatus)}>{locationStatus}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Allows the application to access your precise geographical location.
-              </p>
-              <Button
-                onClick={requestLocationPermission}
-                disabled={locationStatus === "granted" || locationStatus === "unavailable" || isLocationRequesting}
-              >
-                {isLocationRequesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <MapPin className="mr-2 h-4 w-4" />
-                )}
-                Request Location
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Notification Access</CardTitle>
-              <BellRing className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold mb-2">
-                <Badge variant={getBadgeVariant(notificationStatus)}>{notificationStatus}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Allows the application to send you notifications.
-              </p>
-              <Button
-                onClick={requestNotificationPermission}
-                disabled={notificationStatus === "granted" || notificationStatus === "unavailable" || isNotificationRequesting}
-              >
-                {isNotificationRequesting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <BellRing className="mr-2 h-4 w-4" />
-                )}
-                Request Notifications
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex justify-center gap-4 mt-4">
-          <Button variant="outline" onClick={refreshAllPermissionsStatus} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Refresh Status
-          </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset Permissions
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>How to Reset Permissions</DialogTitle>
-                <DialogDescription>
-                  To reset or change permissions for this site, you need to do it manually in your browser settings.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4 text-sm">
-                <p>
-                  <strong>For Chrome/Edge:</strong>
-                  <br />
-                  1. Click the lock icon (🔒) or information icon (ⓘ) next to the URL in the address bar.
-                  <br />
-                  2. Select "Site settings" or "Permissions".
-                  <br />
-                  3. Find the relevant permissions (Camera, Microphone, Location, Notifications, etc.) and change them to "Ask" or "Block".
-                </p>
-                <p>
-                  <strong>For Firefox:</strong>
-                  <br />
-                  1. Click the lock icon (🔒) next to the URL.
-                  <br />
-                  2. Click "Connection secure" then "More information".
-                  <br />
-                  3. Go to the "Permissions" tab and adjust settings.
-                </p>
-                <p>
-                  <strong>For Safari:</strong>
-                  <br />
-                  1. Go to Safari &gt; Settings (or Preferences).
-                  <br />
-                  2. Select the "Websites" tab.
-                  <br />
-                  3. Find this website in the list and adjust its permissions.
-                </p>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button">Got it</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button">Got it</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
