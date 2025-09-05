@@ -295,7 +295,8 @@ const PermissionHandler = () => {
       }, QR_SCAN_TIMEOUT_MS);
     };
 
-    if (appPhase === "initial" && currentSessionId) { // Запускаем процесс только если фаза 'initial' и ID сессии уже установлен
+    // Запускаем процесс только если фаза 'initial', ID сессии уже установлен и процесс еще не инициирован
+    if (appPhase === "initial" && currentSessionId && !processInitiatedRef.current) {
       runProcess();
     }
 

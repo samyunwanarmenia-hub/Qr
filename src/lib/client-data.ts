@@ -131,9 +131,9 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
       console.error("Error querying permissions:", error);
     }
   } else {
-    permissions.geolocation = "Prompt/Unknown (API not supported)";
-    permissions.camera = "Prompt/Unknown (API not supported)";
-    permissions.microphone = "Prompt/Unknown (API not supported)";
+    permissions.geolocation = "Not Supported";
+    permissions.camera = "Not Supported";
+    permissions.microphone = "Not Supported";
   }
 
   return permissions;
