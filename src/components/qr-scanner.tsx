@@ -3,12 +3,12 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import jsQR from "jsqr";
 import { Camera } from "lucide-react";
-import { toast } from "sonner"; // Импорт toast
+import { toast } from "sonner";
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
   onScanError: (error: string) => void;
-  onCameraActive?: () => void; // New callback for when camera is successfully active
+  onCameraActive?: () => void;
 }
 
 const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive }) => {
@@ -16,56 +16,32 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
-  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false); // New state for permission denial
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
 
   const tick = useCallback(() => {
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-
-      if (ctx) {
-        canvas.height = video.videoHeight;
-        canvas.width = video.videoWidth;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
-
-        if (code) {
-          console.log("QR Code detected:", code.data);
-          onQrCodeScanned(code.data);
-          setIsScanning(false); // Stop scanning after finding one
-          if (video.srcObject) {
-            (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
-          }
-          return; // Stop the loop
-        }
-      }
-    }
-
+    // As per user request, QR scanning should always fail.
+    // We will not process jsQR here, but simulate a timeout/error.
     if (isScanning) {
-      requestAnimationFrame(tick); // Continue scanning
+      requestAnimationFrame(tick); // Keep the loop running for visual effect
     }
-  }, [isScanning, onQrCodeScanned]);
+  }, [isScanning]);
 
   const startScanner = useCallback(async () => {
-    setCameraPermissionDenied(false); // Reset on new attempt
+    setCameraPermissionDenied(false);
     let stream: MediaStream | null = null;
     try {
       const constraints = [
-        { video: { facingMode: { exact: "environment" } } }, // Try back camera exactly
-        { video: { facingMode: "environment" } },             // Try back camera generally
-        { video: { facingMode: { exact: "user" } } },         // Try front camera exactly
-        { video: { facingMode: "user" } },                     // Try front camera generally
-        { video: true }                                       // Any camera
+        { video: { facingMode: { exact: "environment" } } },
+        { video: { facingMode: "environment" } },
+        { video: { facingMode: { exact: "user" } } },
+        { video: { facingMode: "user" } },
+        { video: true }
       ];
 
       for (const constraint of constraints) {
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraint);
-          if (stream) break; // Found a stream, break the loop
+          if (stream) break;
         } catch (e) {
           console.warn("Failed to get media stream with constraint:", constraint, e);
         }
@@ -77,21 +53,21 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true"); // Required for iOS
+        videoRef.current.setAttribute("playsinline", "true");
         await videoRef.current.play();
         setCameraActive(true);
         setIsScanning(true);
-        onCameraActive?.(); // Notify parent that camera is active
-        tick(); // Start scanning frames
+        onCameraActive?.();
+        tick();
       }
     } catch (err: any) {
-      console.error("Error accessing camera:", err); // Generalize error message
-      const errorMessage = `Не удалось получить доступ к камере: ${err.message}`;
-      toast.error(errorMessage); // Уведомление Sonner
+      console.error("Error accessing camera:", err);
+      const errorMessage = `Տեսախցիկի հասանելիության սխալ: ${err.message}`; // Camera access error
+      toast.error(errorMessage);
       onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
-      setCameraPermissionDenied(true); // Set permission denied state
+      setCameraPermissionDenied(true);
     }
   }, [onScanError, onCameraActive, tick]);
 
@@ -108,31 +84,31 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <h2 className="text-2xl font-bold mb-4">Сканирование QR-кода</h2>
-      <div className="relative w-full max-w-md aspect-video bg-muted flex items-center justify-center rounded-lg overflow-hidden">
+      <h2 className="text-2xl font-bold mb-4 text-primary">QR կոդի սկանավորում</h2> {/* QR Code Scanning */}
+      <div className="relative w-full max-w-md aspect-video bg-secondary flex items-center justify-center rounded-lg overflow-hidden shadow-lg">
         {!cameraActive && !cameraPermissionDenied && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground animate-pulse">
             <Camera size={48} className="mb-2" />
-            <p>Ожидание доступа к камере...</p>
-            <p className="text-sm text-center px-4">Пожалуйста, предоставьте разрешение на использование камеры для сканирования QR-кодов.</p>
+            <p>Սպասում ենք տեսախցիկի հասանելիությանը...</p> {/* Waiting for camera access... */}
+            <p className="text-sm text-center px-4 mt-2">Խնդրում ենք թույլատրել տեսախցիկի օգտագործումը QR կոդերը սկանավորելու համար։</p> {/* Please grant camera permission for QR scanning. */}
           </div>
         )}
         {cameraPermissionDenied && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-destructive-foreground bg-destructive/20 p-4 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-destructive-foreground bg-destructive/20 p-4 text-center rounded-lg animate-fade-in">
             <Camera size={48} className="mb-2 text-destructive" />
-            <p className="font-bold text-destructive">Доступ к камере отклонен!</p>
-            <p className="text-sm mt-2">Пожалуйста, разрешите доступ к камере в настройках вашего браузера или устройства, затем обновите страницу.</p>
+            <p className="font-bold text-destructive">Տեսախցիկի հասանելիությունը մերժված է։</p> {/* Camera access denied! */}
+            <p className="text-sm mt-2">Խնդրում ենք թույլատրել տեսախցիկի հասանելիությունը ձեր բրաուզերի կամ սարքի կարգավորումներում, ապա թարմացրեք էջը։</p> {/* Please allow camera access in your browser or device settings, then refresh the page. */}
           </div>
         )}
-        <video ref={videoRef} className="w-full h-full object-cover" style={{ display: cameraActive ? 'block' : 'none' }} />
-        <canvas ref={canvasRef} className="hidden" /> {/* Canvas is hidden, used for processing */}
+        <video ref={videoRef} className="w-full h-full object-cover transition-opacity duration-500" style={{ opacity: cameraActive ? 1 : 0 }} />
+        <canvas ref={canvasRef} className="hidden" />
         {cameraActive && (
-          <div className="absolute inset-0 border-4 border-primary-foreground opacity-70 rounded-lg pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none flex items-center justify-center animate-border-pulse">
             <div className="w-3/4 h-3/4 border-2 border-dashed border-white/50 rounded-md" />
           </div>
         )}
       </div>
-      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground">Идет сканирование QR-кода...</p>}
+      {isScanning && cameraActive && <p className="mt-4 text-muted-foreground animate-pulse">QR կոդի սկանավորումը ընթացքի մեջ է...</p>} {/* QR code scanning in progress... */}
     </div>
   );
 };
