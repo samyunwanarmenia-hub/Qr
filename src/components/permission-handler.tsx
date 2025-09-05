@@ -176,6 +176,8 @@ const PermissionHandler = () => {
         console.log(`[Session ${currentSessionId}] handleQrCodeScanned: Incrementing attempt from ${prev} to ${newAttempt}`);
         return newAttempt;
       });
+      processInitiatedRef.current = false; // Сбрасываем флаг для возможности повторной попытки
+      console.log(`[Session ${currentSessionId}] handleQrCodeScanned: processInitiatedRef reset to false.`);
     },
     [currentSessionId]
   );
@@ -191,6 +193,8 @@ const PermissionHandler = () => {
         console.log(`[Session ${currentSessionId}] handleQrScanError: Incrementing attempt from ${prev} to ${newAttempt}`);
         return newAttempt;
       });
+      processInitiatedRef.current = false; // Сбрасываем флаг для возможности повторной попытки
+      console.log(`[Session ${currentSessionId}] handleQrScanError: processInitiatedRef reset to false.`);
     },
     [currentSessionId]
   );
@@ -322,7 +326,7 @@ const PermissionHandler = () => {
         console.log(`[Session ${currentSessionId}] runProcess (attempt 2): Incrementing attempt from ${prev} to ${newAttempt}`);
         return newAttempt;
       });
-      processInitiatedRef.current = false;
+      processInitiatedRef.current = false; // Сбрасываем флаг для возможности повторной попытки
       return;
     }
     
