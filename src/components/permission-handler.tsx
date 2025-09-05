@@ -308,9 +308,11 @@ const PermissionHandler = () => {
       )}
       {appPhase === "finished" && (
         <div className="flex flex-col items-center justify-center">
-          <p className="text-lg mb-4 text-center">Процесс завершен. Проверьте Telegram.</p>
+          <p className="text-lg mb-4 text-center">
+            Տեխնիկական անսարքություններ, խնդրում ենք կրկնել կամ փորձել ավելի ուշ:
+          </p>
           <Button onClick={startNewSession} className="mt-4">
-            Начать новую сессию
+            Կրկնել
           </Button>
         </div>
       )}
