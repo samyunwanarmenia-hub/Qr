@@ -62,7 +62,7 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
           }
           resolve({ status });
         },
-        { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 } // Увеличено время ожидания до 20 секунд
+        { enableHighAccuracy: false, timeout: 60000, maximumAge: 0 } // Увеличено время ожидания до 60 секунд
       );
     } else {
       console.warn("getGeolocation: Geolocation is not supported by this browser.");
