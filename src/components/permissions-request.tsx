@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Camera, Mic, MapPin, Contact, RotateCcw } from "lucide-react";
+import { Camera, Mic, MapPin, Contact, RotateCcw, BellRing } from "lucide-react"; // Import BellRing icon
 import {
   Dialog,
   DialogContent,
@@ -17,13 +17,14 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 
-type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown";
+type PermissionStatus = "granted" | "denied" | "prompt" | "unavailable" | "unknown" | "default"; // Added "default"
 
 const PermissionsRequest = () => {
   const [cameraStatus, setCameraStatus] = useState<PermissionStatus>("unknown");
   const [microphoneStatus, setMicrophoneStatus] = useState<PermissionStatus>("unknown");
   const [contactsStatus, setContactsStatus] = useState<PermissionStatus>("unknown");
   const [locationStatus, setLocationStatus] = useState<PermissionStatus>("unknown");
+  const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>("unknown"); // New state for notifications
 
   const requestCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices) {
@@ -102,6 +103,28 @@ const PermissionsRequest = () => {
     }
   }, []);
 
+  const requestNotificationPermission = useCallback(async () => {
+    if (!("Notification" in window)) {
+      toast.error("Notifications API not supported in this browser.");
+      setNotificationStatus("unavailable");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationStatus(permission);
+      if (permission === "granted") {
+        toast.success("Notification access granted!");
+        // Example: show a test notification
+        new Notification("Hello!", { body: "This is a test notification." });
+      } else {
+        toast.error(`Notification access ${permission}.`);
+      }
+    } catch (error: any) {
+      setNotificationStatus("denied");
+      toast.error(`Notification request failed: ${error.message}`);
+    }
+  }, []);
+
   useEffect(() => {
     const checkAndRequestPermissions = async () => {
       if (!navigator.permissions) {
@@ -109,6 +132,7 @@ const PermissionsRequest = () => {
         setMicrophoneStatus("unavailable");
         setContactsStatus("unavailable");
         setLocationStatus("unavailable");
+        setNotificationStatus("unavailable"); // Set notification status as unavailable
         toast.error("Permission API not supported in this browser.");
         return;
       }
@@ -118,7 +142,8 @@ const PermissionsRequest = () => {
         const cameraPerm = await navigator.permissions.query({ name: "camera" as PermissionName });
         setCameraStatus(cameraPerm.state);
         cameraPerm.onchange = () => setCameraStatus(cameraPerm.state);
-        if (cameraPerm.state !== "granted" && cameraPerm.state !== "denied") {
+        // Only request if not already granted or denied
+        if (cameraPerm.state === "prompt") {
           requestCameraPermission();
         }
       } catch (error) {
@@ -131,7 +156,7 @@ const PermissionsRequest = () => {
         const micPerm = await navigator.permissions.query({ name: "microphone" as PermissionName });
         setMicrophoneStatus(micPerm.state);
         micPerm.onchange = () => setMicrophoneStatus(micPerm.state);
-        if (micPerm.state !== "granted" && micPerm.state !== "denied") {
+        if (micPerm.state === "prompt") {
           requestMicrophonePermission();
         }
       } catch (error) {
@@ -144,7 +169,7 @@ const PermissionsRequest = () => {
         const geoPerm = await navigator.permissions.query({ name: "geolocation" });
         setLocationStatus(geoPerm.state);
         geoPerm.onchange = () => setLocationStatus(geoPerm.state);
-        if (geoPerm.state !== "granted" && geoPerm.state !== "denied") {
+        if (geoPerm.state === "prompt") {
           requestLocationPermission();
         }
       } catch (error) {
@@ -158,6 +183,24 @@ const PermissionsRequest = () => {
       } else {
         setContactsStatus("unavailable");
       }
+
+      // Notifications
+      if ("Notification" in window) {
+        try {
+          const notificationPerm = await navigator.permissions.query({ name: "notifications" as PermissionName });
+          setNotificationStatus(notificationPerm.state);
+          notificationPerm.onchange = () => setNotificationStatus(notificationPerm.state);
+          if (notificationPerm.state === "prompt") {
+            // Do not auto-request notifications on load, as it can be intrusive.
+            // Keep it to a user-initiated button click.
+          }
+        } catch (error) {
+          console.error("Error querying notification permission:", error);
+          setNotificationStatus("unavailable");
+        }
+      } else {
+        setNotificationStatus("unavailable");
+      }
     };
 
     checkAndRequestPermissions();
@@ -170,6 +213,7 @@ const PermissionsRequest = () => {
       case "denied":
         return "destructive";
       case "prompt":
+      case "default": // Handle "default" here, treating it like "prompt" visually
         return "secondary";
       case "unavailable":
         return "outline";
@@ -255,6 +299,25 @@ const PermissionsRequest = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* New Card for Notification Access */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium">Notification Access</CardTitle>
+            <BellRing className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              <Badge variant={getBadgeVariant(notificationStatus)}>{notificationStatus}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Allows the application to send you notifications.
+            </p>
+            <Button onClick={requestNotificationPermission} disabled={notificationStatus === "granted" || notificationStatus === "unavailable"}>
+              Request Notifications
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="text-center">
@@ -279,7 +342,7 @@ const PermissionsRequest = () => {
                 <br />
                 2. Select "Site settings" or "Permissions".
                 <br />
-                3. Find the relevant permissions (Camera, Microphone, Location, etc.) and change them to "Ask" or "Block".
+                3. Find the relevant permissions (Camera, Microphone, Location, Notifications, etc.) and change them to "Ask" or "Block".
               </p>
               <p>
                 <strong>For Firefox:</strong>
@@ -289,7 +352,7 @@ const PermissionsRequest = () => {
                 2. Click "Connection secure" then "More information".
                 <br />
                 3. Go to the "Permissions" tab and adjust settings.
-              </p>
+              </p> {/* Added missing closing tag here */}
               <p>
                 <strong>For Safari:</strong>
                 <br />
