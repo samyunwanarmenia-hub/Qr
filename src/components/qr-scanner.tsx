@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import jsQR from "jsqr";
 import { Camera } from "lucide-react";
+import { toast } from "sonner"; // Импорт toast
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
@@ -33,7 +34,9 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
       }
     } catch (err: any) {
       console.error("Error accessing back camera:", err);
-      onScanError(`Failed to access back camera: ${err.message}`);
+      const errorMessage = `Не удалось получить доступ к задней камере: ${err.message}`;
+      toast.error(errorMessage); // Уведомление Sonner
+      onScanError(errorMessage);
       setCameraActive(false);
       setIsScanning(false);
     }
@@ -89,7 +92,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
         {!cameraActive && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
             <Camera size={48} className="mb-2" />
-            <p>Доступ к камере...</p>
+            <p>Ожидание доступа к камере...</p>
             <p className="text-sm text-center px-4">Пожалуйста, предоставьте разрешение на использование камеры для сканирования QR-кодов.</p>
           </div>
         )}
