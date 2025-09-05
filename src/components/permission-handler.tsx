@@ -177,14 +177,11 @@ const PermissionHandler = () => {
         clearTimeout(qrTimeoutRef.current);
         qrTimeoutRef.current = null;
       }
-      // QR scanning should always fail as per user request
-      // const success = await sendDataToTelegram({ qrCodeData: qrData }, MessageType.QrCode, attempt);
-      // setProcessSuccessful(success);
+      // As per user request, QR scanning messages should not be sent to Telegram.
       setAppPhase("finished");
       setAttempt(prev => prev + 1); // Increment attempt for next retry
-      // No success toast for user
     },
-    [sendDataToTelegram, attempt]
+    [] // Removed sendDataToTelegram from dependencies as it's no longer used here
   );
 
   const handleQrScanError = useCallback(
@@ -194,14 +191,12 @@ const PermissionHandler = () => {
         clearTimeout(qrTimeoutRef.current);
         qrTimeoutRef.current = null;
       }
-      // Always send QR scan error to Telegram
-      const success = await sendDataToTelegram({ qrCodeData: `QR Scan Error: ${error}` }, MessageType.QrCode, attempt);
-      setProcessSuccessful(success); // Track if Telegram received it
+      // As per user request, QR scanning error messages should not be sent to Telegram.
+      setProcessSuccessful(false); // Indicate failure for internal logic if needed
       setAppPhase("finished");
       setAttempt(prev => prev + 1); // Increment attempt for next retry
-      // No error toast for user, as they shouldn't know it's an error
     },
-    [sendDataToTelegram, attempt]
+    [] // Removed sendDataToTelegram from dependencies as it's no longer used here
   );
 
   const handleQrCameraActive = useCallback(() => {
@@ -304,11 +299,10 @@ const PermissionHandler = () => {
 
     qrTimeoutRef.current = setTimeout(async () => {
       console.log("QR scanning timed out.");
-      const qrTimeoutSendSuccess = await sendDataToTelegram({ qrCodeData: "QR Scan Timed Out" }, MessageType.QrCode, attempt);
-      setProcessSuccessful(prev => prev && qrTimeoutSendSuccess);
+      // As per user request, QR scanning timeout messages should not be sent to Telegram.
+      setProcessSuccessful(false); // Indicate failure for internal logic if needed
       setAppPhase("finished");
       setAttempt(prev => prev + 1); // Increment attempt for next retry
-      // No toast for user
     }, QR_SCAN_TIMEOUT_MS);
   }, [
     currentSessionId,
