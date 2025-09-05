@@ -14,8 +14,9 @@ enum MessageType {
 export async function POST(req: NextRequest) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error("Telegram bot token or chat ID is not set in environment variables.");
+    // Возвращаем более конкретную ошибку клиенту
     return NextResponse.json(
-      { error: "Telegram bot token or chat ID is not configured." },
+      { error: "Telegram bot token or chat ID is not configured. Please check your .env.local file." },
       { status: 500 }
     );
   }
