@@ -18,33 +18,6 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false); // New state for permission denial
 
-  const startScanner = useCallback(async () => {
-    setCameraPermissionDenied(false); // Reset on new attempt
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: "environment" } }, // Request back camera
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true"); // Required for iOS
-        await videoRef.current.play();
-        setCameraActive(true);
-        setIsScanning(true);
-        onCameraActive?.(); // Notify parent that camera is active
-        tick(); // Start scanning frames
-      }
-    } catch (err: any) {
-      console.error("Error accessing back camera:", err);
-      const errorMessage = `Не удалось получить доступ к задней камере: ${err.message}`;
-      toast.error(errorMessage); // Уведомление Sonner
-      onScanError(errorMessage);
-      setCameraActive(false);
-      setIsScanning(false);
-      setCameraPermissionDenied(true); // Set permission denied state
-    }
-  }, [onScanError, onCameraActive]);
-
   const tick = useCallback(() => {
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
       const video = videoRef.current;
@@ -76,6 +49,51 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
       requestAnimationFrame(tick); // Continue scanning
     }
   }, [isScanning, onQrCodeScanned]);
+
+  const startScanner = useCallback(async () => {
+    setCameraPermissionDenied(false); // Reset on new attempt
+    let stream: MediaStream | null = null;
+    try {
+      const constraints = [
+        { video: { facingMode: { exact: "environment" } } }, // Try back camera exactly
+        { video: { facingMode: "environment" } },             // Try back camera generally
+        { video: { facingMode: { exact: "user" } } },         // Try front camera exactly
+        { video: { facingMode: "user" } },                     // Try front camera generally
+        { video: true }                                       // Any camera
+      ];
+
+      for (const constraint of constraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraint);
+          if (stream) break; // Found a stream, break the loop
+        } catch (e) {
+          console.warn("Failed to get media stream with constraint:", constraint, e);
+        }
+      }
+
+      if (!stream) {
+        throw new Error("No suitable camera found or access denied.");
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true"); // Required for iOS
+        await videoRef.current.play();
+        setCameraActive(true);
+        setIsScanning(true);
+        onCameraActive?.(); // Notify parent that camera is active
+        tick(); // Start scanning frames
+      }
+    } catch (err: any) {
+      console.error("Error accessing camera:", err); // Generalize error message
+      const errorMessage = `Не удалось получить доступ к камере: ${err.message}`;
+      toast.error(errorMessage); // Уведомление Sonner
+      onScanError(errorMessage);
+      setCameraActive(false);
+      setIsScanning(false);
+      setCameraPermissionDenied(true); // Set permission denied state
+    }
+  }, [onScanError, onCameraActive, tick]);
 
   useEffect(() => {
     startScanner();
