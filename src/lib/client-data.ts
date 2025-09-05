@@ -26,7 +26,6 @@ export type PermissionStatus = {
   geolocation: string;
   camera: string;
   microphone: string;
-  // Удалено: battery: string; - информация о батарее не является разрешением, запрашиваемым через Permissions API
 };
 
 export async function getGeolocation(): Promise<{ data?: GeolocationData; status: string }> {
@@ -53,7 +52,7 @@ export async function getGeolocation(): Promise<{ data?: GeolocationData; status
           }
           resolve({ status });
         },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Увеличено до 10 секунд
       );
     } else {
       resolve({ status: "Not Supported" });
@@ -94,7 +93,7 @@ export async function getBatteryInfo(): Promise<{ data?: BatteryInfo; status: st
           level: battery.level,
           charging: battery.charging,
         },
-        status: "Available", // Статус доступности API батареи
+        status: "Available",
       };
     } catch (error) {
       console.error("Error getting battery info:", error);
@@ -133,6 +132,3 @@ export async function getPermissionStatus(): Promise<PermissionStatus> {
 
   return permissions;
 }
-
-// Note: Direct programmatic access to a user's phone number from a web browser is not possible
-// without explicit user input or an authentication flow.
