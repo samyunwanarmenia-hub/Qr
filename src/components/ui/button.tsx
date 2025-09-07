@@ -38,6 +38,9 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  // Explicitly add variant and size here to resolve TS2339 if VariantProps isn't fully resolving
+  variant?: VariantProps<typeof buttonVariants>["variant"];
+  size?: VariantProps<typeof buttonVariants>["size"];
   asChild?: boolean
 }
 

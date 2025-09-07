@@ -48,7 +48,12 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  // Explicitly add these properties to resolve TS2339 if base types aren't fully resolving
+  side?: VariantProps<typeof sheetVariants>["side"];
+  className?: string;
+  children?: React.ReactNode;
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,

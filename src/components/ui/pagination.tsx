@@ -38,8 +38,9 @@ PaginationItem.displayName = "PaginationItem"
 
 type PaginationLinkProps = {
   isActive?: boolean
-} & Pick<ButtonProps, "size"> & // This should now correctly pick 'size' from the updated ButtonProps
-  React.ComponentProps<"a">
+} & React.ComponentProps<"a"> & {
+  size?: ButtonProps["size"]; // Directly include size from ButtonProps
+}
 
 const PaginationLink = ({
   className,

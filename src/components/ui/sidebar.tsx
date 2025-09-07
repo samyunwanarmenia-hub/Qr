@@ -14,7 +14,7 @@ import {
   SheetOverlay,
   SheetPortal,
   SheetTrigger,
-  SheetContentProps, // Import SheetContentProps
+  // SheetContentProps, // Removed incorrect import of SheetContentProps
 } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -37,6 +37,8 @@ const sidebarVariants = cva(
 interface SidebarProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof sidebarVariants> {
+  // Explicitly add variant here to resolve TS2339 if VariantProps isn't fully resolving
+  variant?: VariantProps<typeof sidebarVariants>["variant"];
   children?: React.ReactNode
   mobileBreakpoint?: number
   defaultOpen?: boolean

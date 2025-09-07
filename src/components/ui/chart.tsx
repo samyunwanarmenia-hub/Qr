@@ -13,6 +13,7 @@ interface ChartPayloadItem {
   color?: string;
   payload?: any; // For nested data if any
   fill?: string; // For fill color
+  valueKey?: string; // Added valueKey
 }
 
 // ... (rest of the file, assuming it's the same as provided, just adding the interface)
@@ -53,7 +54,7 @@ const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
   ({ config, className, children, ...props }, ref) => {
     const chartVars = React.useMemo(() => {
       return Object.entries(config).reduce(
-        (acc, [key, item]) => {
+        (acc, [key, item]: [string, ChartConfig[keyof ChartConfig]]) => { // Explicitly type item
           const color = item.color ?? `hsl(var(--chart-${key}))`
           return {
             ...acc,

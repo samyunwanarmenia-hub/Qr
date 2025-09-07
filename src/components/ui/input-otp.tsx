@@ -73,10 +73,10 @@ const InputOTPMirror = React.forwardRef<
     return null;
   }
   const { slots } = inputOTPContext;
-  const chars = slots.map((slot) => slot.char);
+  const chars = slots.map((slot: OTPInputContextValue['slots'][number]) => slot.char); // Explicitly type slot
   return (
     <div ref={ref} className={cn("flex items-center", className)} {...props}>
-      {chars.map((char, index) => (
+      {chars.map((char: string, index: number) => ( // Explicitly type char and index
         <div
           key={index}
           className="relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md"
