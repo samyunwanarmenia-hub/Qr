@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { OTPInput, OTPInputContext } from "input-otp"
+import { OTPInput, OTPInputContext, type OTPInputContextValue } from "input-otp" // Import OTPInputContextValue
 import { Minus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -34,15 +34,20 @@ const InputOTPSlot = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div"> & { index: number }
 >(({ index, className, ...props }, ref) => {
-  const inputOTPContext = React.useContext(OTPInputContext)
-  const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
+  const inputOTPContext = React.useContext(OTPInputContext) as OTPInputContextValue | null; // Cast to OTPInputContextValue or null
+  if (!inputOTPContext) {
+    // Handle the case where context is null, e.g., throw an error or return null
+    console.error("InputOTPSlot must be used within an InputOTP component.");
+    return null;
+  }
+  const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index];
 
   return (
     <div
       ref={ref}
       className={cn(
-        "relative flex h-9 w-9 items-center justify-center border-y border-r border-input text-sm shadow-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md",
-        isActive && "z-10 ring-1 ring-ring",
+        "relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md",
+        isActive && "z-10 ring-2 ring-ring ring-offset-background",
         className
       )}
       {...props}
@@ -58,14 +63,41 @@ const InputOTPSlot = React.forwardRef<
 })
 InputOTPSlot.displayName = "InputOTPSlot"
 
+const InputOTPMirror = React.forwardRef<
+  React.ElementRef<"div">,
+  React.ComponentPropsWithoutRef<"div">
+>(({ className, ...props }, ref) => {
+  const inputOTPContext = React.useContext(OTPInputContext) as OTPInputContextValue | null; // Cast to OTPInputContextValue or null
+  if (!inputOTPContext) {
+    console.error("InputOTPMirror must be used within an InputOTP component.");
+    return null;
+  }
+  const { slots } = inputOTPContext;
+  const chars = slots.map((slot) => slot.char);
+  return (
+    <div ref={ref} className={cn("flex items-center", className)} {...props}>
+      {chars.map((char, index) => (
+        <div
+          key={index}
+          className="relative flex h-10 w-10 items-center justify-center border-y border-r border-input text-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md"
+        >
+          {char}
+        </div>
+      ))}
+    </div>
+  );
+});
+InputOTPMirror.displayName = "InputOTPMirror";
+
+
 const InputOTPSeparator = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div">
->(({ ...props }, ref) => (
-  <div ref={ref} role="separator" {...props}>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("-mx-2 flex items-center", className)} {...props}>
     <Minus />
   </div>
 ))
 InputOTPSeparator.displayName = "InputOTPSeparator"
 
-export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }
+export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator, InputOTPMirror }

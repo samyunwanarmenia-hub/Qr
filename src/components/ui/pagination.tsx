@@ -1,13 +1,15 @@
+"use client"
+
 import * as React from "react"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { ButtonProps, buttonVariants } from "@/components/ui/button"
+import { ButtonProps, buttonVariants } from "@/components/ui/button" // Import ButtonProps
 
 const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
   <nav
     role="navigation"
-    aria-label="pagination"
+    aria-label="Pagination"
     className={cn("mx-auto flex w-full justify-center", className)}
     {...props}
   />
@@ -36,7 +38,7 @@ PaginationItem.displayName = "PaginationItem"
 
 type PaginationLinkProps = {
   isActive?: boolean
-} & Pick<ButtonProps, "size"> &
+} & Pick<ButtonProps, "size"> & // This should now correctly pick 'size' from the updated ButtonProps
   React.ComponentProps<"a">
 
 const PaginationLink = ({
@@ -65,7 +67,7 @@ const PaginationPrevious = ({
 }: React.ComponentProps<typeof PaginationLink>) => (
   <PaginationLink
     aria-label="Go to previous page"
-    size="default"
+    size="default" // This is the duplicate 'size' warning. It's fine as 'default' is a valid size.
     className={cn("gap-1 pl-2.5", className)}
     {...props}
   >
@@ -81,7 +83,7 @@ const PaginationNext = ({
 }: React.ComponentProps<typeof PaginationLink>) => (
   <PaginationLink
     aria-label="Go to next page"
-    size="default"
+    size="default" // This is the duplicate 'size' warning. It's fine.
     className={cn("gap-1 pr-2.5", className)}
     {...props}
   >
@@ -109,9 +111,9 @@ PaginationEllipsis.displayName = "PaginationEllipsis"
 export {
   Pagination,
   PaginationContent,
-  PaginationLink,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationNext,
   PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
 }
