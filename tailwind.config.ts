@@ -1,5 +1,4 @@
 import type { Config } from "tailwindcss";
-import tailwindcssAnimate from "tailwindcss-animate"; // Changed from require
 
 export default {
     darkMode: ["class"],
@@ -91,5 +90,5 @@ export default {
   		}
   	}
   },
-  plugins: [tailwindcssAnimate], // Used the imported module
+  plugins: [require("tailwindcss-animate")], // Changed to use require directly
 } satisfies Config;

@@ -54,7 +54,7 @@ const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
   ({ config, className, children, ...props }, ref) => {
     const chartVars = React.useMemo(() => {
       return Object.entries(config).reduce(
-        (acc, [key, item]: [string, ChartConfig[keyof ChartConfig]]) => { // Explicitly type item
+        (acc: { [key: string]: string }, [key, item]: [string, ChartConfig[keyof ChartConfig]]) => { // Explicitly type acc and item
           const color = item.color ?? `hsl(var(--chart-${key}))`
           return {
             ...acc,
