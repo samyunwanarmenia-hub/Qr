@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { OTPInput, OTPInputContext, RenderProps } from "input-otp" // Import RenderProps
+import { OTPInput, OTPInputContext, RenderProps } from "input-otp"
 import { Minus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -34,8 +34,8 @@ const InputOTPSlot = React.forwardRef<
   React.ElementRef<"div">,
   React.ComponentPropsWithoutRef<"div"> & { index: number }
 >(({ index, className, ...props }, ref) => {
-  // Use RenderProps to type the context
-  const inputOTPContext = React.useContext(OTPInputContext) as RenderProps;
+  // Use React.Context<RenderProps> to correctly type the context
+  const inputOTPContext = React.useContext(OTPInputContext as React.Context<RenderProps>);
   const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
 
   return (

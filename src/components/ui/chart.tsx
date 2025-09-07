@@ -7,6 +7,7 @@ import * as RechartsPrimitive from "recharts"
 type NameType = any;
 type ValueType = any;
 type Payload<V, N> = any;
+type ResponsiveContainerProps = any; // Defined locally as any
 type DataKey<T> = any;
 
 import { cn } from "@/lib/utils"
@@ -75,7 +76,7 @@ const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
           {...props} // Spread remaining props onto the div
         >
           <RechartsPrimitive.ResponsiveContainer {...responsiveContainerProps}>
-            {children}
+            {children as React.ReactElement<any, any>} {/* Explicitly cast children */}
           </RechartsPrimitive.ResponsiveContainer>
         </div>
       </ChartContext.Provider>
