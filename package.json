@@ -1,4 +1,7 @@
-{
+{"engines": {
+  "node": "20.x"
+}
+
   "name": "next-template",
   "version": "0.1.0",
   "private": true,
@@ -8,6 +11,7 @@
     "start": "next start",
     "lint": "next lint"
   },
+  
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -56,7 +60,6 @@
     "recharts": "^2.15.3",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.3.1",
-    "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "zod": "^3.25.28"
   },
@@ -67,6 +70,7 @@
     "@types/react-dom": "^19",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
   }
 }
