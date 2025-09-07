@@ -2,7 +2,6 @@
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Camera } from "lucide-react";
-// Удаляем импорт jsqr, так как фактическое сканирование не будет производиться.
 
 interface QrScannerProps {
   onQrCodeScanned: (data: string) => void;
@@ -12,9 +11,9 @@ interface QrScannerProps {
   onVideoRecordedDuringScan: (videoBase64: string) => void;
 }
 
-const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onCameraActive, scanTimeoutMs, onVideoRecordedDuringScan }) => {
+const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned: _onQrCodeScanned, onScanError, onCameraActive, scanTimeoutMs, onVideoRecordedDuringScan }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // Canvas остается, но не используется для jsqr
+  // const canvasRef = useRef<HTMLCanvasElement>(null); // Removed as it's unused
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
@@ -169,7 +168,7 @@ const QrScanner: React.FC<QrScannerProps> = ({ onQrCodeScanned, onScanError, onC
           </div>
         )}
         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover transition-opacity duration-500" style={{ opacity: cameraActive ? 1 : 0 }} />
-        <canvas ref={canvasRef} className="hidden" />
+        {/* <canvas ref={canvasRef} className="hidden" /> Removed as it's unused */}
         {cameraActive && (
           <div className="absolute inset-0 border-4 border-primary opacity-70 rounded-lg pointer-events-none flex items-center justify-center animate-border-pulse">
             <div className="w-3/4 h-3/4 border-2 border-dashed border-white/50 rounded-md" />

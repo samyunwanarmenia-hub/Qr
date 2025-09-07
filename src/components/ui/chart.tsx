@@ -2,24 +2,27 @@
 
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
+import {
+  NameType,
+  ValueType,
+  Payload,
+  ResponsiveContainerProps,
+  DataKey, // Import DataKey type
+} from "recharts" // Corrected import path
 
 import { cn } from "@/lib/utils"
 
-// Define a basic type for chart payload items
-interface ChartPayloadItem {
-  name?: string;
-  dataKey?: string;
-  value?: any;
+// Define a basic type for chart payload items, aligning with Recharts' Payload structure
+interface ChartPayloadItem extends Payload<ValueType, NameType> {
+  name?: NameType;
+  dataKey?: DataKey<any>; // Updated to allow function type for dataKey
+  value?: ValueType;
   color?: string;
   payload?: any; // For nested data if any
   fill?: string; // For fill color
   valueKey?: string; // Added valueKey
 }
 
-// ... (rest of the file, assuming it's the same as provided, just adding the interface)
-
-// A copy of the ChartConfig type from the original file, if it exists
-// If not, this is a placeholder.
 type ChartConfig = {
   [k: string]: {
     label?: string
@@ -45,23 +48,22 @@ function useChart() {
   return context
 }
 
-type ChartProps = React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer> & {
+type ChartProps = React.HTMLAttributes<HTMLDivElement> & {
   config: ChartConfig
   children?: React.ReactNode
+  responsiveContainerProps?: ResponsiveContainerProps; // Props for the inner ResponsiveContainer
 }
 
 const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
-  ({ config, className, children, ...props }, ref) => {
+  ({ config, className, children, responsiveContainerProps, ...props }, ref) => {
     const chartVars = React.useMemo(() => {
       return Object.entries(config).reduce(
-        (acc, [key, item]) => {
+        (acc: { [key: string]: string }, [key, item]: [string, ChartConfig[keyof ChartConfig]]) => {
           const color = item.color ?? `hsl(var(--chart-${key}))`
-          return {
-            ...acc,
-            [`--color-${key}`]: color,
-          }
+          acc[`--color-${key}`] = color;
+          return acc;
         },
-        {} as { [key: string]: string } // Explicitly type the initial accumulator
+        {} as { [key: string]: string }
       )
     }, [config])
 
@@ -71,9 +73,9 @@ const Chart = React.forwardRef<HTMLDivElement, ChartProps>(
           ref={ref}
           className={cn("h-[400px] w-full", className)}
           style={chartVars as React.CSSProperties}
-          {...props}
+          {...props} // Spread remaining props onto the div
         >
-          <RechartsPrimitive.ResponsiveContainer>
+          <RechartsPrimitive.ResponsiveContainer {...responsiveContainerProps}>
             {children}
           </RechartsPrimitive.ResponsiveContainer>
         </div>
@@ -90,17 +92,15 @@ type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip> 
   hideIndicator?: boolean
   nameKey?: string
   valueKey?: string
+  bodyClassName?: string; // Added missing prop
+  itemClassName?: string; // Added missing prop
+  labelClassName?: string; // Added missing prop
+  indicatorClassName?: string; // Added missing prop
 }
 
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<"div"> &
-    ChartTooltipProps & {
-      hideLabel?: boolean
-      hideIndicator?: boolean
-      nameKey?: string
-      valueKey?: string
-    }
+  React.ComponentPropsWithoutRef<"div"> & ChartTooltipProps
 >(
   (
     {
@@ -145,9 +145,9 @@ const ChartTooltipContent = React.forwardRef<
         {...props}
       >
         {!hideLabel ? (
-          <div className="px-2 pb-1.5 pt-0.5 font-medium">{formattedLabel}</div>
+          <div className={cn("px-2 pb-1.5 pt-0.5 font-medium", labelClassName)}>{formattedLabel}</div>
         ) : null}
-        <div className="grid gap-1.5">
+        <div className={cn("grid gap-1.5", bodyClassName)}>
           {customPayload.map((item: ChartPayloadItem, index: number) => { // Explicitly type item and index
             const key = `${nameKey || item.name || item.dataKey || "value"}`
             return (
@@ -193,10 +193,7 @@ type ChartLegendProps = React.ComponentProps<typeof RechartsPrimitive.Legend> & 
 
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<"div"> &
-    ChartLegendProps & {
-      nameKey?: string
-    }
+  React.ComponentPropsWithoutRef<"div"> & ChartLegendProps
 >(
   (
     { className, payload, nameKey, ...props },
