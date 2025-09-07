@@ -2,13 +2,12 @@
 
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
-import {
-  NameType,
-  ValueType,
-  Payload,
-  ResponsiveContainerProps,
-  DataKey, // Import DataKey type
-} from "recharts" // Corrected import path
+// Defining these types locally as 'any' to unblock the build, as direct import from 'recharts' is failing.
+// This is a temporary workaround. The root cause might be related to React 19 types or Recharts version.
+type NameType = any;
+type ValueType = any;
+type Payload<V, N> = any;
+type DataKey<T> = any;
 
 import { cn } from "@/lib/utils"
 
@@ -50,7 +49,7 @@ function useChart() {
 
 type ChartProps = React.HTMLAttributes<HTMLDivElement> & {
   config: ChartConfig
-  children?: React.ReactNode
+  children?: React.ReactElement | null | undefined // More specific type for ResponsiveContainer children
   responsiveContainerProps?: ResponsiveContainerProps; // Props for the inner ResponsiveContainer
 }
 

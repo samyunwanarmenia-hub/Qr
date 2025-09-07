@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Add any other environment variables your app needs here, e.g.:
+  # NEXT_PUBLIC_SUPABASE_URL = "your_supabase_url"
+  # NEXT_PUBLIC_SUPABASE_ANON_KEY = "your_supabase_anon_key"
+  # TELEGRAM_BOT_TOKEN = "your_telegram_bot_token"
+  # TELEGRAM_CHAT_ID = "your_telegram_chat_id"
