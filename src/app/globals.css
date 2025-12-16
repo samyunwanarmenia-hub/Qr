@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%; /* Dark background */
+    --foreground: 0 0% 98%; /* Light foreground text */
+
+    --card: 240 10% 3.9%; /* Dark card background */
+    --card-foreground: 0 0% 98%; /* Light card text */
+
+    --popover: 240 10% 3.9%; /* Dark popover background */
+    --popover-foreground: 0 0% 98%; /* Light popover text */
+
+    --primary: 0 0% 98%; /* Light primary color for text/icons on dark background */
+    --primary-foreground: 240 10% 3.9%; /* Dark text on primary */
+
+    --secondary: 240 3.7% 15.9%; /* Slightly lighter dark for secondary elements */
+    --secondary-foreground: 0 0% 98%; /* Light text on secondary */
+
+    --muted: 240 3.7% 15.9%; /* Muted dark background */
+    --muted-foreground: 0 0% 63.9%; /* Muted light text */
+
+    --accent: 240 3.7% 15.9%; /* Accent dark background */
+    --accent-foreground: 0 0% 98%; /* Light text on accent */
+
+    --destructive: 0 62.8% 30.6%; /* Red for destructive actions */
+    --destructive-foreground: 0 0% 98%; /* Light text on destructive */
+
+    --border: 240 3.7% 15.9%; /* Dark border color */
+    --input: 240 3.7% 15.9%; /* Dark input background */
+    --ring: 0 0% 83.1%; /* Light ring color */
+
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 240 10% 3.9%; /* Dark sidebar background */
+    --sidebar-foreground: 0 0% 98%; /* Light sidebar text */
+    --sidebar-primary: 0 0% 98%; /* Light primary for sidebar */
+    --sidebar-primary-foreground: 240 10% 3.9%; /* Dark text on sidebar primary */
+    --sidebar-accent: 240 3.7% 15.9%; /* Sidebar accent dark */
+    --sidebar-accent-foreground: 0 0% 98%; /* Light text on sidebar accent */
+    --sidebar-border: 240 3.7% 15.9%; /* Sidebar border dark */
+    --sidebar-ring: 0 0% 83.1%; /* Sidebar ring light */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+[data-nextjs-toast],
+[data-nextjs-toast-wrapper],
+[data-nextjs-dev-tools-button],
+[data-next-badge-root],
+[data-next-badge],
+nextjs-portal,
+#nextjs__container_errors,
+#nextjs-build-error,
+#nextjs-server-side-error,
+#next-dev-overlay {
+  display: none !important;
+}
+
+[data-nextjs-toast],
+[data-nextjs-toast-wrapper],
+[data-nextjs-dev-tools-button],
+[data-next-badge-root],
+[data-next-badge] {
+  display: none !important;
+}

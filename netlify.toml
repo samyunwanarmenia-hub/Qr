@@ -1,0 +1,13 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Примечание: Переменные окружения TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID
+  # должны быть установлены в панели Netlify (Site settings > Environment variables)
+  # НЕ добавляйте их сюда в открытом виде для безопасности!
+
+# Для Next.js на Netlify важно правильно настроить функции
+[functions]
+  node_bundler = "esbuild"
